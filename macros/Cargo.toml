@@ -1,5 +1,5 @@
 [package]
-name = "serde_schema_macros"
+name = "serde_sc_macros"
 version.workspace = true
 edition.workspace = true
 

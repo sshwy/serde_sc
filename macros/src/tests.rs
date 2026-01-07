@@ -34,7 +34,7 @@ fn check_enum_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
 #[test]
 fn test_unit_struct() {
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::UnitStruct {
+        ::serde_sc::expr::TypeExpr::UnitStruct {
             name: ::std::borrow::Cow::Borrowed("Unit")
         }
     };
@@ -62,22 +62,22 @@ fn test_primitive_fields_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::Bool)));
-        __fields.push(::serde_schema::expr::Field::new("b", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I8)));
-        __fields.push(::serde_schema::expr::Field::new("c", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I16)));
-        __fields.push(::serde_schema::expr::Field::new("d", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)));
-        __fields.push(::serde_schema::expr::Field::new("e", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I64)));
-        __fields.push(::serde_schema::expr::Field::new("f", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I128)));
-        __fields.push(::serde_schema::expr::Field::new("g", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)));
-        __fields.push(::serde_schema::expr::Field::new("h", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U16)));
-        __fields.push(::serde_schema::expr::Field::new("i", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)));
-        __fields.push(::serde_schema::expr::Field::new("j", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U64)));
-        __fields.push(::serde_schema::expr::Field::new("k", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U128)));
-        __fields.push(::serde_schema::expr::Field::new("l", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::F32)));
-        __fields.push(::serde_schema::expr::Field::new("m", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::F64)));
-        __fields.push(::serde_schema::expr::Field::new("n", ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::Char)));
-        ::serde_schema::expr::TypeExpr::Struct {
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new("a", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::Bool)));
+        __fields.push(::serde_sc::expr::Field::new("b", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I8)));
+        __fields.push(::serde_sc::expr::Field::new("c", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I16)));
+        __fields.push(::serde_sc::expr::Field::new("d", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)));
+        __fields.push(::serde_sc::expr::Field::new("e", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I64)));
+        __fields.push(::serde_sc::expr::Field::new("f", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I128)));
+        __fields.push(::serde_sc::expr::Field::new("g", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)));
+        __fields.push(::serde_sc::expr::Field::new("h", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U16)));
+        __fields.push(::serde_sc::expr::Field::new("i", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)));
+        __fields.push(::serde_sc::expr::Field::new("j", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U64)));
+        __fields.push(::serde_sc::expr::Field::new("k", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U128)));
+        __fields.push(::serde_sc::expr::Field::new("l", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::F32)));
+        __fields.push(::serde_sc::expr::Field::new("m", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::F64)));
+        __fields.push(::serde_sc::expr::Field::new("n", ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::Char)));
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -94,10 +94,10 @@ fn test_string_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::String));
-        __fields.push(::serde_schema::expr::Field::new("b", ::serde_schema::expr::TypeExpr::String));
-        ::serde_schema::expr::TypeExpr::Struct {
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new("a", ::serde_sc::expr::TypeExpr::String));
+        __fields.push(::serde_sc::expr::Field::new("b", ::serde_sc::expr::TypeExpr::String));
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -118,14 +118,14 @@ fn test_seq_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)) }));
-        __fields.push(::serde_schema::expr::Field::new("b", ::serde_schema::expr::TypeExpr::Bytes));
-        __fields.push(::serde_schema::expr::Field::new("c", ::serde_schema::expr::TypeExpr::Bytes));
-        __fields.push(::serde_schema::expr::Field::new("d", ::serde_schema::expr::TypeExpr::Tuple { elements: vec![::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32); 3usize] }));
-        __fields.push(::serde_schema::expr::Field::new("e", ::serde_schema::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)) }));
-        __fields.push(::serde_schema::expr::Field::new("f", ::serde_schema::expr::TypeExpr::Bytes));
-        ::serde_schema::expr::TypeExpr::Struct {
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new("a", ::serde_sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)) }));
+        __fields.push(::serde_sc::expr::Field::new("b", ::serde_sc::expr::TypeExpr::Bytes));
+        __fields.push(::serde_sc::expr::Field::new("c", ::serde_sc::expr::TypeExpr::Bytes));
+        __fields.push(::serde_sc::expr::Field::new("d", ::serde_sc::expr::TypeExpr::Tuple { elements: vec![::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32); 3usize] }));
+        __fields.push(::serde_sc::expr::Field::new("e", ::serde_sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)) }));
+        __fields.push(::serde_sc::expr::Field::new("f", ::serde_sc::expr::TypeExpr::Bytes));
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -142,10 +142,10 @@ fn test_map_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::Map { key: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::String), value: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)), }));
-        __fields.push(::serde_schema::expr::Field::new("b", ::serde_schema::expr::TypeExpr::Map { key: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)), value: ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Bytes), }));
-        ::serde_schema::expr::TypeExpr::Struct {
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new("a", ::serde_sc::expr::TypeExpr::Map { key: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::String), value: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)), }));
+        __fields.push(::serde_sc::expr::Field::new("b", ::serde_sc::expr::TypeExpr::Map { key: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)), value: ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Bytes), }));
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -161,9 +161,9 @@ fn test_unit_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::Unit));
-        ::serde_schema::expr::TypeExpr::Struct {
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new("a", ::serde_sc::expr::TypeExpr::Unit));
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -180,22 +180,22 @@ fn test_option_in_struct() {
         }
         "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new(
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new(
             "a",
-            ::serde_schema::expr::TypeExpr::Option(
+            ::serde_sc::expr::TypeExpr::Option(
                 ::std::boxed::Box::new(
-                    ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+                    ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)
                 )
             )
         ));
-        __fields.push(::serde_schema::expr::Field::new(
+        __fields.push(::serde_sc::expr::Field::new(
             "b",
-            ::serde_schema::expr::TypeExpr::Option(
-                ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Bytes)
+            ::serde_sc::expr::TypeExpr::Option(
+                ::std::boxed::Box::new(::serde_sc::expr::TypeExpr::Bytes)
             )
         ));
-        ::serde_schema::expr::TypeExpr::Struct {
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
             fields: __fields,
         }
@@ -206,10 +206,10 @@ fn test_option_in_struct() {
 #[test]
 fn test_newtype_struct() {
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::NewtypeStruct {
+        ::serde_sc::expr::TypeExpr::NewtypeStruct {
             name: ::std::borrow::Cow::Borrowed("New"),
             inner: ::std::boxed::Box::new(
-                ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
             ),
         }
     };
@@ -219,11 +219,11 @@ fn test_newtype_struct() {
 #[test]
 fn test_tuple_struct() {
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::TupleStruct {
+        ::serde_sc::expr::TypeExpr::TupleStruct {
             name: ::std::borrow::Cow::Borrowed("Tup"),
             elements: vec![
-                ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8),
-                ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)
+                ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8),
+                ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)
             ],
         }
     };
@@ -239,12 +239,12 @@ fn test_struct_rename_attr() {
         }
     "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-        __fields.push(::serde_schema::expr::Field::new(
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new(
             "a",
-            ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+            ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
         ));
-        ::serde_schema::expr::TypeExpr::Struct {
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("Renamed"),
             fields: __fields,
         }
@@ -259,7 +259,7 @@ fn test_newtype_struct_transparent_attr() {
         struct Wrap(u32);
     "#;
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)
     };
     check_struct_to_typeexpr(input, expected);
 }
@@ -273,7 +273,7 @@ fn test_braced_struct_transparent_attr() {
         }
     "#;
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)
     };
     check_struct_to_typeexpr(input, expected);
 }
@@ -288,25 +288,25 @@ fn test_struct_flatten_attr() {
         }
     "#;
     let expected = quote! {{
-        let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
         {
-            let __inner = <Inner as ::serde_schema::SerdeSchema>::serde_schema();
+            let __inner = <Inner as ::serde_sc::SerdeSchema>::serde_sc();
             match __inner {
-                ::serde_schema::expr::TypeExpr::Struct { name: _, fields } => {
+                ::serde_sc::expr::TypeExpr::Struct { name: _, fields } => {
                     __fields.extend(fields);
                 }
                 _other => {
                     panic!(
-                        "serde_schema: #[serde(flatten)] is only supported for fields whose SerdeSchema is TypeExpr::Struct"
+                        "serde_sc: #[serde(flatten)] is only supported for fields whose SerdeSchema is TypeExpr::Struct"
                     );
                 }
             }
         }
-        __fields.push(::serde_schema::expr::Field::new(
+        __fields.push(::serde_sc::expr::Field::new(
             "a",
-            ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+            ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
         ));
-        ::serde_schema::expr::TypeExpr::Struct {
+        ::serde_sc::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("Outer"),
             fields: __fields,
         }
@@ -360,20 +360,20 @@ fn test_enum_tag_attr() {
     "#;
 
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::Enum {
+        ::serde_sc::expr::TypeExpr::Enum {
             name: ::std::borrow::Cow::Borrowed("E"),
             tag: ::std::option::Option::Some(::std::borrow::Cow::Borrowed("type")),
             content: ::std::option::Option::None,
             variants: vec![
-                ::serde_schema::expr::EnumVariant::new("A", {
-                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-                    __fields.push(::serde_schema::expr::Field::new(
+                ::serde_sc::expr::EnumVariant::new("A", {
+                    let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+                    __fields.push(::serde_sc::expr::Field::new(
                         "a",
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
                     ));
-                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                    ::serde_sc::expr::VariantKind::Struct(__fields)
                 }),
-                ::serde_schema::expr::EnumVariant::new("B", ::serde_schema::expr::VariantKind::Unit)
+                ::serde_sc::expr::EnumVariant::new("B", ::serde_sc::expr::VariantKind::Unit)
             ],
         }
     };
@@ -410,32 +410,32 @@ fn test_enum_external_repr() {
     "#;
 
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::Enum {
+        ::serde_sc::expr::TypeExpr::Enum {
             name: ::std::borrow::Cow::Borrowed("E"),
             tag: ::std::option::Option::None,
             content: ::std::option::Option::None,
             variants: vec![
-                ::serde_schema::expr::EnumVariant::new("Unit", ::serde_schema::expr::VariantKind::Unit),
-                ::serde_schema::expr::EnumVariant::new(
+                ::serde_sc::expr::EnumVariant::new("Unit", ::serde_sc::expr::VariantKind::Unit),
+                ::serde_sc::expr::EnumVariant::new(
                     "New",
-                    ::serde_schema::expr::VariantKind::Newtype(::std::boxed::Box::new(
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                    ::serde_sc::expr::VariantKind::Newtype(::std::boxed::Box::new(
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
                     ))
                 ),
-                ::serde_schema::expr::EnumVariant::new(
+                ::serde_sc::expr::EnumVariant::new(
                     "Tup",
-                    ::serde_schema::expr::VariantKind::Tuple(vec![
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8),
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)
+                    ::serde_sc::expr::VariantKind::Tuple(vec![
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8),
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)
                     ])
                 ),
-                ::serde_schema::expr::EnumVariant::new("Struct", {
-                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-                    __fields.push(::serde_schema::expr::Field::new(
+                ::serde_sc::expr::EnumVariant::new("Struct", {
+                    let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+                    __fields.push(::serde_sc::expr::Field::new(
                         "a",
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
                     ));
-                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                    ::serde_sc::expr::VariantKind::Struct(__fields)
                 })
             ],
         }
@@ -457,32 +457,32 @@ fn test_enum_adjacent_tag_attr() {
     "#;
 
     let expected = quote! {
-        ::serde_schema::expr::TypeExpr::Enum {
+        ::serde_sc::expr::TypeExpr::Enum {
             name: ::std::borrow::Cow::Borrowed("E"),
             tag: ::std::option::Option::Some(::std::borrow::Cow::Borrowed("t")),
             content: ::std::option::Option::Some(::std::borrow::Cow::Borrowed("c")),
             variants: vec![
-                ::serde_schema::expr::EnumVariant::new("Unit", ::serde_schema::expr::VariantKind::Unit),
-                ::serde_schema::expr::EnumVariant::new(
+                ::serde_sc::expr::EnumVariant::new("Unit", ::serde_sc::expr::VariantKind::Unit),
+                ::serde_sc::expr::EnumVariant::new(
                     "New",
-                    ::serde_schema::expr::VariantKind::Newtype(::std::boxed::Box::new(
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                    ::serde_sc::expr::VariantKind::Newtype(::std::boxed::Box::new(
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
                     ))
                 ),
-                ::serde_schema::expr::EnumVariant::new(
+                ::serde_sc::expr::EnumVariant::new(
                     "Tup",
-                    ::serde_schema::expr::VariantKind::Tuple(vec![
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8),
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)
+                    ::serde_sc::expr::VariantKind::Tuple(vec![
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8),
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)
                     ])
                 ),
-                ::serde_schema::expr::EnumVariant::new("Struct", {
-                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
-                    __fields.push(::serde_schema::expr::Field::new(
+                ::serde_sc::expr::EnumVariant::new("Struct", {
+                    let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+                    __fields.push(::serde_sc::expr::Field::new(
                         "a",
-                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
                     ));
-                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                    ::serde_sc::expr::VariantKind::Struct(__fields)
                 })
             ],
         }

@@ -30,14 +30,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_schema"
+name = "serde_sc"
 version = "0.1.0"
 dependencies = [
- "serde_schema_macros",
+ "serde_sc_macros",
 ]
 
 [[package]]
-name = "serde_schema_macros"
+name = "serde_sc_macros"
 version = "0.1.0"
 dependencies = [
  "convert_case",

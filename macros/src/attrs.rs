@@ -104,19 +104,19 @@ pub(crate) fn parse_variant_serde_attrs(
             if meta.path.is_ident("untagged") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(untagged)] is not supported",
+                    "serde_sc: #[serde(untagged)] is not supported",
                 ));
             }
             if meta.path.is_ident("tag") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
+                    "serde_sc: #[serde(tag = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("content") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(content = ...)] is only supported on enum containers",
+                    "serde_sc: #[serde(content = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
@@ -157,19 +157,19 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
             if meta.path.is_ident("untagged") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(untagged)] is not supported",
+                    "serde_sc: #[serde(untagged)] is not supported",
                 ));
             }
             if meta.path.is_ident("tag") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
+                    "serde_sc: #[serde(tag = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("content") {
                 return Err(Error::new(
                     meta.path.span(),
-                    "serde_schema: #[serde(content = ...)] is only supported on enum containers",
+                    "serde_sc: #[serde(content = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {

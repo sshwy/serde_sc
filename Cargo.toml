@@ -7,9 +7,9 @@ version = "0.1.0"
 edition = "2024"
 
 [package]
-name = "serde_schema"
+name = "serde_sc"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde_schema_macros = { path = "macros" }
+serde_sc_macros = { path = "macros" }

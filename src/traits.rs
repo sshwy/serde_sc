@@ -3,11 +3,11 @@ use crate::expr::{PrimitiveType, TypeExpr};
 use std::collections::{BTreeMap, HashMap};
 
 pub trait SerdeSchema {
-    fn serde_schema() -> TypeExpr;
+    fn serde_sc() -> TypeExpr;
 }
 
 impl SerdeSchema for () {
-    fn serde_schema() -> TypeExpr {
+    fn serde_sc() -> TypeExpr {
         TypeExpr::Unit
     }
 }
@@ -18,9 +18,9 @@ macro_rules! impl_serde_schema_for_tuple {
         where
             $($T: SerdeSchema),+
         {
-            fn serde_schema() -> TypeExpr {
+            fn serde_sc() -> TypeExpr {
                 TypeExpr::Tuple {
-                    elements: vec![$(<$T as SerdeSchema>::serde_schema()),+],
+                    elements: vec![$(<$T as SerdeSchema>::serde_sc()),+],
                 }
             }
         }
@@ -39,8 +39,8 @@ impl<T> SerdeSchema for Option<T>
 where
     T: SerdeSchema,
 {
-    fn serde_schema() -> TypeExpr {
-        TypeExpr::option(T::serde_schema())
+    fn serde_sc() -> TypeExpr {
+        TypeExpr::option(T::serde_sc())
     }
 }
 
@@ -48,8 +48,8 @@ impl<T> SerdeSchema for Vec<T>
 where
     T: SerdeSchema,
 {
-    fn serde_schema() -> TypeExpr {
-        let inner = T::serde_schema();
+    fn serde_sc() -> TypeExpr {
+        let inner = T::serde_sc();
         if matches!(inner, TypeExpr::Primitive(PrimitiveType::U8)) {
             TypeExpr::Bytes
         } else {
@@ -63,8 +63,8 @@ where
     K: SerdeSchema,
     V: SerdeSchema,
 {
-    fn serde_schema() -> TypeExpr {
-        TypeExpr::map(K::serde_schema(), V::serde_schema())
+    fn serde_sc() -> TypeExpr {
+        TypeExpr::map(K::serde_sc(), V::serde_sc())
     }
 }
 
@@ -73,7 +73,7 @@ where
     K: SerdeSchema,
     V: SerdeSchema,
 {
-    fn serde_schema() -> TypeExpr {
-        TypeExpr::map(K::serde_schema(), V::serde_schema())
+    fn serde_sc() -> TypeExpr {
+        TypeExpr::map(K::serde_sc(), V::serde_sc())
     }
 }
