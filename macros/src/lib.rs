@@ -155,38 +155,16 @@ fn struct_to_typeexpr(
                 return Ok(type_to_typeexpr(&non_skipped[0].ty));
             }
 
-            let mut field_exprs = Vec::new();
-            for f in &fields.named {
-                let f_ident = f
-                    .ident
-                    .as_ref()
-                    .ok_or_else(|| Error::new(f.span(), "missing field ident"))?;
-                let f_attrs = parse_field_serde_attrs(&f.attrs)?;
-                if f_attrs.skip_serializing {
-                    continue;
-                }
+            let field_stmts = named_fields_to_field_stmts(fields, container.rename_all)?;
 
-                let original = f_ident.to_string();
-                let has_rename = f_attrs.rename.is_some();
-                let mut ser_name = f_attrs.rename.unwrap_or_else(|| original.clone());
-                if !has_rename {
-                    if let Some(rule) = container.rename_all {
-                        ser_name = apply_rename_all(rule, &original);
-                    }
-                }
-
-                let ty_expr = type_to_typeexpr(&f.ty);
-                field_exprs.push(quote! {
-                    ::serde_schema::expr::Field::new(#ser_name, #ty_expr)
-                });
-            }
-
-            Ok(quote! {
+            Ok(quote! {{
+                let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
+                #(#field_stmts)*
                 ::serde_schema::expr::TypeExpr::Struct {
                     name: #name_ts,
-                    fields: vec![#(#field_exprs),*],
+                    fields: __fields,
                 }
-            })
+            }})
         }
     }
 }
@@ -234,33 +212,13 @@ fn enum_to_typeexpr(
                 }
             }
             Fields::Named(fields) => {
-                let mut field_exprs = Vec::new();
-                for f in &fields.named {
-                    let f_ident = f
-                        .ident
-                        .as_ref()
-                        .ok_or_else(|| Error::new(f.span(), "missing field ident"))?;
-                    let f_attrs = parse_field_serde_attrs(&f.attrs)?;
-                    if f_attrs.skip_serializing {
-                        continue;
-                    }
+                let field_stmts = named_fields_to_field_stmts(fields, v_attrs.rename_all)?;
 
-                    let original = f_ident.to_string();
-                    let has_rename = f_attrs.rename.is_some();
-                    let mut ser_name = f_attrs.rename.unwrap_or_else(|| original.clone());
-                    if !has_rename {
-                        if let Some(rule) = v_attrs.rename_all {
-                            ser_name = apply_rename_all(rule, &original);
-                        }
-                    }
-
-                    let ty_expr = type_to_typeexpr(&f.ty);
-                    field_exprs.push(quote! {
-                        ::serde_schema::expr::Field::new(#ser_name, #ty_expr)
-                    });
-                }
-
-                quote! { ::serde_schema::expr::VariantKind::Struct(vec![#(#field_exprs),*]) }
+                quote! {{
+                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
+                    #(#field_stmts)*
+                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                }}
             }
         };
 
@@ -285,6 +243,73 @@ fn quote_identexpr(s: &str) -> TokenStream2 {
 
 fn apply_rename_all(case: Case, s: &str) -> String {
     s.to_case(case)
+}
+
+fn named_fields_to_field_stmts(
+    fields: &syn::FieldsNamed,
+    rename_all: Option<Case<'static>>,
+) -> syn::Result<Vec<TokenStream2>> {
+    let mut field_stmts = Vec::new();
+
+    for f in &fields.named {
+        let f_ident = f
+            .ident
+            .as_ref()
+            .ok_or_else(|| Error::new(f.span(), "missing field ident"))?;
+
+        let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+        if f_attrs.skip_serializing {
+            if f_attrs.flatten {
+                return Err(Error::new(
+                    f.span(),
+                    "field cannot be both #[serde(flatten)] and skipped",
+                ));
+            }
+            continue;
+        }
+
+        if f_attrs.flatten {
+            if f_attrs.rename.is_some() {
+                return Err(Error::new(
+                    f.span(),
+                    "field cannot be both #[serde(flatten)] and #[serde(rename = ...)]",
+                ));
+            }
+            let inner = type_to_typeexpr(&f.ty);
+            field_stmts.push(quote! {
+                {
+                    let __inner = #inner;
+                    match __inner {
+                        ::serde_schema::expr::TypeExpr::Struct { name: _, fields } => {
+                            __fields.extend(fields);
+                        }
+                        _other => {
+                            panic!(
+                                "serde_schema: #[serde(flatten)] is only supported for fields whose SerdeSchema is TypeExpr::Struct"
+                            );
+                        }
+                    }
+                }
+            });
+            continue;
+        }
+
+        let original = f_ident.to_string();
+        let has_rename = f_attrs.rename.is_some();
+        let mut ser_name = f_attrs.rename.unwrap_or_else(|| original.clone());
+        if !has_rename {
+            if let Some(rule) = rename_all {
+                ser_name = apply_rename_all(rule, &original);
+            }
+        }
+
+        let ty_expr = type_to_typeexpr(&f.ty);
+        field_stmts.push(quote! {
+            __fields.push(::serde_schema::expr::Field::new(#ser_name, #ty_expr));
+        });
+    }
+
+    Ok(field_stmts)
 }
 
 fn type_to_typeexpr(ty: &Type) -> TokenStream2 {

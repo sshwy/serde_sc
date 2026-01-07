@@ -19,6 +19,7 @@ pub(crate) struct VariantSerdeAttrs {
 pub(crate) struct FieldSerdeAttrs {
     pub(crate) rename: Option<String>,
     pub(crate) skip_serializing: bool,
+    pub(crate) flatten: bool,
 }
 
 fn parse_serde_rename_all(s: &str) -> Option<Case<'static>> {
@@ -120,6 +121,10 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
                 out.skip_serializing = true;
+                return Ok(());
+            }
+            if meta.path.is_ident("flatten") {
+                out.flatten = true;
                 return Ok(());
             }
             if meta.path.is_ident("rename") {
