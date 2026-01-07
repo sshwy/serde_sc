@@ -1,6 +1,7 @@
 //! Proc-macro crate for `serde_schema`.
 
 extern crate proc_macro;
+mod attrs;
 #[cfg(test)]
 mod tests;
 
@@ -12,6 +13,11 @@ use quote::quote;
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Error, Fields, GenericParam, LitStr, PathArguments,
     Type, parse_macro_input, spanned::Spanned,
+};
+
+use crate::attrs::{
+    ContainerSerdeAttrs, parse_container_serde_attrs, parse_field_serde_attrs,
+    parse_variant_serde_attrs,
 };
 
 /// Derive macro that generates an implementation of `serde_schema::SerdeSchema`.
@@ -62,135 +68,6 @@ fn add_serde_schema_bounds(where_clause: &mut Option<syn::WhereClause>, generics
         wc.predicates
             .push(syn::parse_quote!(#ident: ::serde_schema::SerdeSchema));
     }
-}
-
-#[derive(Debug, Default, Clone)]
-struct ContainerSerdeAttrs {
-    rename: Option<String>,
-    rename_all: Option<Case<'static>>,
-    transparent: bool,
-}
-
-#[derive(Debug, Default, Clone)]
-struct VariantSerdeAttrs {
-    rename: Option<String>,
-    rename_all: Option<Case<'static>>,
-    skip_serializing: bool,
-}
-
-#[derive(Debug, Default, Clone)]
-struct FieldSerdeAttrs {
-    rename: Option<String>,
-    skip_serializing: bool,
-}
-
-fn parse_serde_rename_all(s: &str) -> Option<Case<'static>> {
-    Some(match s {
-        "lowercase" => Case::Lower,
-        "UPPERCASE" => Case::Upper,
-        "snake_case" => Case::Snake,
-        "kebab-case" => Case::Kebab,
-        "camelCase" => Case::Camel,
-        "PascalCase" => Case::Pascal,
-        "SCREAMING_SNAKE_CASE" => Case::UpperSnake,
-        "SCREAMING-KEBAB-CASE" => Case::UpperKebab,
-        _ => return None,
-    })
-}
-
-fn parse_container_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<ContainerSerdeAttrs> {
-    let mut out = ContainerSerdeAttrs::default();
-
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("transparent") {
-                out.transparent = true;
-                return Ok(());
-            }
-            if meta.path.is_ident("rename") {
-                let v: LitStr = meta.value()?.parse()?;
-                out.rename = Some(v.value());
-                return Ok(());
-            }
-            if meta.path.is_ident("rename_all") {
-                let v: LitStr = meta.value()?.parse()?;
-                out.rename_all = Some(parse_serde_rename_all(&v.value()).ok_or_else(|| {
-                    Error::new(
-                        v.span(),
-                        format!("unsupported rename_all rule: {}", v.value()),
-                    )
-                })?);
-                return Ok(());
-            }
-            Ok(())
-        })?;
-    }
-
-    Ok(out)
-}
-
-fn parse_variant_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<VariantSerdeAttrs> {
-    let mut out = VariantSerdeAttrs::default();
-
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
-                out.skip_serializing = true;
-                return Ok(());
-            }
-            if meta.path.is_ident("rename") {
-                let v: LitStr = meta.value()?.parse()?;
-                out.rename = Some(v.value());
-                return Ok(());
-            }
-            if meta.path.is_ident("rename_all") {
-                let v: LitStr = meta.value()?.parse()?;
-                out.rename_all = Some(parse_serde_rename_all(&v.value()).ok_or_else(|| {
-                    Error::new(
-                        v.span(),
-                        format!("unsupported rename_all rule: {}", v.value()),
-                    )
-                })?);
-                return Ok(());
-            }
-            Ok(())
-        })?;
-    }
-
-    Ok(out)
-}
-
-fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<FieldSerdeAttrs> {
-    let mut out = FieldSerdeAttrs::default();
-
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
-                out.skip_serializing = true;
-                return Ok(());
-            }
-            if meta.path.is_ident("rename") {
-                let v: LitStr = meta.value()?.parse()?;
-                out.rename = Some(v.value());
-                return Ok(());
-            }
-            Ok(())
-        })?;
-    }
-
-    Ok(out)
 }
 
 fn type_def_to_typeexpr(
