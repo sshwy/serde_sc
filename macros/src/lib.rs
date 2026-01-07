@@ -89,10 +89,10 @@ fn struct_to_typeexpr(
     ds: &DataStruct,
     container: &ContainerSerdeAttrs,
 ) -> syn::Result<TokenStream2> {
-    if container.tag.is_some() {
+    if container.tag.is_some() || container.content.is_some() {
         return Err(Error::new(
             ident.span(),
-            "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
+            "serde_schema: #[serde(tag/content = ...)] is only supported on enum containers",
         ));
     }
 
@@ -187,7 +187,15 @@ fn enum_to_typeexpr(
             "serde_schema: #[serde(untagged)] is not supported",
         ));
     }
-    if container.tag.is_some() {
+
+    if container.content.is_some() && container.tag.is_none() {
+        return Err(Error::new(
+            ident.span(),
+            "serde_schema: #[serde(content = ...)] requires #[serde(tag = ...)]",
+        ));
+    }
+
+    if container.tag.is_some() && container.content.is_none() {
         // `#[serde(tag = "...")]` (internally tagged) only supports unit and struct variants.
         for v in &de.variants {
             match &v.fields {
@@ -211,6 +219,11 @@ fn enum_to_typeexpr(
         .tag
         .as_deref()
         .map(|t| quote! { ::std::option::Option::Some(::std::borrow::Cow::Borrowed(#t)) })
+        .unwrap_or_else(|| quote! { ::std::option::Option::None });
+    let content_ts = container
+        .content
+        .as_deref()
+        .map(|c| quote! { ::std::option::Option::Some(::std::borrow::Cow::Borrowed(#c)) })
         .unwrap_or_else(|| quote! { ::std::option::Option::None });
 
     let mut variants_ts = Vec::new();
@@ -264,6 +277,7 @@ fn enum_to_typeexpr(
         ::serde_schema::expr::TypeExpr::Enum {
             name: #name_ts,
             tag: #tag_ts,
+            content: #content_ts,
             variants: vec![#(#variants_ts),*],
         }
     })

@@ -126,9 +126,15 @@ pub enum TypeExpr {
     /// `tuple_variant` / `struct_variant`).
     Enum {
         name: IdentExpr,
-        /// If present, this enum is *internally tagged* with the given field name
-        /// (i.e. `#[serde(tag = "...")]`).
+        /// If present, this enum uses a tagged representation.
+        ///
+        /// - `tag = Some(..), content = None` corresponds to *internally tagged*
+        ///   enums (`#[serde(tag = "...")]`).
+        /// - `tag = Some(..), content = Some(..)` corresponds to *adjacently tagged*
+        ///   enums (`#[serde(tag = "...", content = "...")]`).
         tag: Option<IdentExpr>,
+        /// Present only for *adjacently tagged* enums.
+        content: Option<IdentExpr>,
         variants: Vec<EnumVariant>,
     },
 }
