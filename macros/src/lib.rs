@@ -1,6 +1,8 @@
 //! Proc-macro crate for `serde_schema`.
 
 extern crate proc_macro;
+#[cfg(test)]
+mod tests;
 
 use proc_macro::TokenStream;
 
@@ -215,11 +217,11 @@ fn struct_to_typeexpr(
         .rename
         .clone()
         .unwrap_or_else(|| ident.to_string());
-    let name_ts = quote_some_string(&name);
+    let name_ts = quote_identexpr(&name);
 
     match &ds.fields {
         Fields::Unit => Ok(quote! {
-            ::serde_schema::expr::TypeExpr::UnitStruct { name: ::std::string::String::from(#name) }
+            ::serde_schema::expr::TypeExpr::UnitStruct { name: #name_ts }
         }),
         Fields::Unnamed(fields) => {
             if fields.unnamed.len() == 1 && container.transparent {
@@ -232,7 +234,7 @@ fn struct_to_typeexpr(
                 let inner = type_to_typeexpr(&fields.unnamed[0].ty);
                 return Ok(quote! {
                     ::serde_schema::expr::TypeExpr::NewtypeStruct {
-                        name: ::std::string::String::from(#name),
+                        name: #name_ts,
                         inner: ::std::boxed::Box::new(#inner),
                     }
                 });
@@ -245,7 +247,7 @@ fn struct_to_typeexpr(
                 .collect::<Vec<_>>();
             Ok(quote! {
                 ::serde_schema::expr::TypeExpr::TupleStruct {
-                    name: ::std::string::String::from(#name),
+                    name: #name_ts,
                     elements: vec![#(#elems),*],
                 }
             })
@@ -296,7 +298,7 @@ fn enum_to_typeexpr(
         .rename
         .clone()
         .unwrap_or_else(|| ident.to_string());
-    let name_ts = quote_some_string(&name);
+    let name_ts = quote_identexpr(&name);
 
     let mut variants_ts = Vec::new();
     for v in &de.variants {
@@ -373,8 +375,10 @@ fn enum_to_typeexpr(
     })
 }
 
-fn quote_some_string(s: &str) -> TokenStream2 {
-    quote! { ::std::option::Option::Some(::std::string::String::from(#s)) }
+fn quote_identexpr(s: &str) -> TokenStream2 {
+    // IdentExpr is `Cow<'static, str>`. Since `s` becomes a string literal in
+    // the expanded code, we can use a borrowed `'static` str.
+    quote! { ::std::borrow::Cow::Borrowed(#s) }
 }
 
 fn apply_rename_all(case: Case, s: &str) -> String {

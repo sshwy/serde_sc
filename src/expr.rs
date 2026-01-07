@@ -6,6 +6,10 @@
 //! Serde data model types (plus the necessary structure for named fields and
 //! enum variants).
 
+use std::borrow::Cow;
+
+pub type IdentExpr = Cow<'static, str>;
+
 /// Primitive types in the Serde data model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
@@ -28,12 +32,12 @@ pub enum PrimitiveType {
 /// A (named) field in a `struct` / `struct_variant`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Field {
-    pub name: String,
+    pub name: IdentExpr,
     pub ty: TypeExpr,
 }
 
 impl Field {
-    pub fn new(name: impl Into<String>, ty: impl Into<TypeExpr>) -> Self {
+    pub fn new(name: impl Into<IdentExpr>, ty: impl Into<TypeExpr>) -> Self {
         Self {
             name: name.into(),
             ty: ty.into(),
@@ -44,12 +48,12 @@ impl Field {
 /// An enum variant in the Serde data model.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumVariant {
-    pub name: String,
+    pub name: IdentExpr,
     pub kind: VariantKind,
 }
 
 impl EnumVariant {
-    pub fn new(name: impl Into<String>, kind: VariantKind) -> Self {
+    pub fn new(name: impl Into<IdentExpr>, kind: VariantKind) -> Self {
         Self {
             name: name.into(),
             kind,
@@ -89,10 +93,13 @@ pub enum TypeExpr {
     Unit,
 
     /// Serde `unit_struct` (named value containing no data).
-    UnitStruct { name: String },
+    UnitStruct { name: IdentExpr },
 
     /// Serde `newtype_struct` (named wrapper around a single value).
-    NewtypeStruct { name: String, inner: Box<TypeExpr> },
+    NewtypeStruct {
+        name: IdentExpr,
+        inner: Box<TypeExpr>,
+    },
 
     /// Serde `seq` (variably-sized heterogeneous sequence).
     Seq { element: Box<TypeExpr> },
@@ -102,7 +109,7 @@ pub enum TypeExpr {
 
     /// Serde `tuple_struct` (named tuple).
     TupleStruct {
-        name: String,
+        name: IdentExpr,
         elements: Vec<TypeExpr>,
     },
 
@@ -113,12 +120,12 @@ pub enum TypeExpr {
     },
 
     /// Serde `struct` (statically-sized key-value pairing with string keys).
-    Struct { name: String, fields: Vec<Field> },
+    Struct { name: IdentExpr, fields: Vec<Field> },
 
     /// Serde enum representation (covers `unit_variant` / `newtype_variant` /
     /// `tuple_variant` / `struct_variant`).
     Enum {
-        name: String,
+        name: IdentExpr,
         variants: Vec<EnumVariant>,
     },
 }
