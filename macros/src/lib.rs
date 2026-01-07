@@ -174,6 +174,13 @@ fn enum_to_typeexpr(
     de: &DataEnum,
     container: &ContainerSerdeAttrs,
 ) -> syn::Result<TokenStream2> {
+    if container.untagged {
+        return Err(Error::new(
+            ident.span(),
+            "serde_schema: #[serde(untagged)] is not supported",
+        ));
+    }
+
     let name = container
         .rename
         .clone()

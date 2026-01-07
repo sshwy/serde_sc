@@ -1,7 +1,7 @@
 use quote::quote;
 use syn::{Data, DeriveInput};
 
-use crate::{parse_container_serde_attrs, struct_to_typeexpr};
+use crate::{expand_serde_schema, parse_container_serde_attrs, struct_to_typeexpr};
 
 fn check_struct_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
     let input: DeriveInput = syn::parse_str(input).expect("parse input");
@@ -297,4 +297,22 @@ fn test_struct_flatten_attr() {
         }
     }};
     check_struct_to_typeexpr(input, expected);
+}
+
+#[test]
+fn test_enum_untagged_attr_errors() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        #[serde(untagged)]
+        enum E {
+            A { a: u8 },
+            B { b: u8 },
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    let err = expand_serde_schema(&input).expect_err("expected error");
+    let msg = err.to_string();
+    assert!(msg.contains("untagged"), "msg was: {msg}");
 }

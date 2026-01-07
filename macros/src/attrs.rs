@@ -1,11 +1,12 @@
 use convert_case::Case;
-use syn::{Error, LitStr};
+use syn::{Error, LitStr, spanned::Spanned};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct ContainerSerdeAttrs {
     pub(crate) rename: Option<String>,
     pub(crate) rename_all: Option<Case<'static>>,
     pub(crate) transparent: bool,
+    pub(crate) untagged: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -51,6 +52,10 @@ pub(crate) fn parse_container_serde_attrs(
                 out.transparent = true;
                 return Ok(());
             }
+            if meta.path.is_ident("untagged") {
+                out.untagged = true;
+                return Ok(());
+            }
             if meta.path.is_ident("rename") {
                 let v: LitStr = meta.value()?.parse()?;
                 out.rename = Some(v.value());
@@ -84,6 +89,12 @@ pub(crate) fn parse_variant_serde_attrs(
         }
 
         attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("untagged") {
+                return Err(Error::new(
+                    meta.path.span(),
+                    "serde_schema: #[serde(untagged)] is not supported",
+                ));
+            }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
                 out.skip_serializing = true;
                 return Ok(());
@@ -119,6 +130,12 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
         }
 
         attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("untagged") {
+                return Err(Error::new(
+                    meta.path.span(),
+                    "serde_schema: #[serde(untagged)] is not supported",
+                ));
+            }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
                 out.skip_serializing = true;
                 return Ok(());
