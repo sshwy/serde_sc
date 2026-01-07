@@ -113,15 +113,12 @@ pub enum TypeExpr {
     },
 
     /// Serde `struct` (statically-sized key-value pairing with string keys).
-    Struct {
-        name: Option<String>,
-        fields: Vec<Field>,
-    },
+    Struct { name: String, fields: Vec<Field> },
 
     /// Serde enum representation (covers `unit_variant` / `newtype_variant` /
     /// `tuple_variant` / `struct_variant`).
     Enum {
-        name: Option<String>,
+        name: String,
         variants: Vec<EnumVariant>,
     },
 }
