@@ -9,7 +9,7 @@ use proc_macro::TokenStream;
 
 use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Error, Fields, GenericParam, LitStr, PathArguments,
     Type, parse_macro_input, spanned::Spanned,
@@ -468,7 +468,7 @@ fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
     }
 
     // Fallback for unsupported syn::Type forms.
-    let msg = format!("unsupported type for SerdeSchema: {:?}", ty);
+    let msg = format!("unsupported type for SerdeSchema: {}", ty.to_token_stream());
     let lit = LitStr::new(&msg, Span::call_site());
     quote! { compile_error!(#lit) }
 }
