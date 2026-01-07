@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["."]
+members = [".", "macros"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,3 +12,4 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+serde_schema_macros = { path = "macros" }

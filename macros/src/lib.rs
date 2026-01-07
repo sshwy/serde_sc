@@ -1,0 +1,545 @@
+//! Proc-macro crate for `serde_schema`.
+
+extern crate proc_macro;
+
+use proc_macro::TokenStream;
+
+use convert_case::{Case, Casing};
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::quote;
+use syn::{
+    Data, DataEnum, DataStruct, DeriveInput, Error, Fields, GenericParam, LitStr, PathArguments,
+    Type, parse_macro_input, spanned::Spanned,
+};
+
+/// Derive macro that generates an implementation of `serde_schema::SerdeSchema`.
+///
+/// It inspects struct/enum fields and a subset of Serde attributes
+/// (see <https://serde.rs/attributes.html>), then produces `TypeExpr` construction code.
+#[proc_macro_derive(SerdeSchema, attributes(serde))]
+pub fn derive_serde_schema(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    match expand_serde_schema(&input) {
+        Ok(ts) => ts.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+/// Parse the input type and generate a `TypeExpr` expression.
+fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
+    let ident = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let mut where_clause = where_clause.cloned();
+    add_serde_schema_bounds(&mut where_clause, &input.generics);
+
+    let container = parse_container_serde_attrs(&input.attrs)?;
+
+    let body_expr = type_def_to_typeexpr(input, &container)?;
+
+    Ok(quote! {
+        impl #impl_generics ::serde_schema::SerdeSchema for #ident #ty_generics #where_clause {
+            fn serde_schema() -> ::serde_schema::expr::TypeExpr {
+                #body_expr
+            }
+        }
+    })
+}
+
+fn add_serde_schema_bounds(where_clause: &mut Option<syn::WhereClause>, generics: &syn::Generics) {
+    let wc = where_clause.get_or_insert_with(|| syn::WhereClause {
+        where_token: Default::default(),
+        predicates: Default::default(),
+    });
+
+    for param in &generics.params {
+        let GenericParam::Type(ty) = param else {
+            continue;
+        };
+        let ident = &ty.ident;
+        wc.predicates
+            .push(syn::parse_quote!(#ident: ::serde_schema::SerdeSchema));
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+struct ContainerSerdeAttrs {
+    rename: Option<String>,
+    rename_all: Option<Case<'static>>,
+    transparent: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+struct VariantSerdeAttrs {
+    rename: Option<String>,
+    rename_all: Option<Case<'static>>,
+    skip_serializing: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+struct FieldSerdeAttrs {
+    rename: Option<String>,
+    skip_serializing: bool,
+}
+
+fn parse_serde_rename_all(s: &str) -> Option<Case<'static>> {
+    Some(match s {
+        "lowercase" => Case::Lower,
+        "UPPERCASE" => Case::Upper,
+        "snake_case" => Case::Snake,
+        "kebab-case" => Case::Kebab,
+        "camelCase" => Case::Camel,
+        "PascalCase" => Case::Pascal,
+        "SCREAMING_SNAKE_CASE" => Case::UpperSnake,
+        "SCREAMING-KEBAB-CASE" => Case::UpperKebab,
+        _ => return None,
+    })
+}
+
+fn parse_container_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<ContainerSerdeAttrs> {
+    let mut out = ContainerSerdeAttrs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("transparent") {
+                out.transparent = true;
+                return Ok(());
+            }
+            if meta.path.is_ident("rename") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.rename = Some(v.value());
+                return Ok(());
+            }
+            if meta.path.is_ident("rename_all") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.rename_all = Some(parse_serde_rename_all(&v.value()).ok_or_else(|| {
+                    Error::new(
+                        v.span(),
+                        format!("unsupported rename_all rule: {}", v.value()),
+                    )
+                })?);
+                return Ok(());
+            }
+            Ok(())
+        })?;
+    }
+
+    Ok(out)
+}
+
+fn parse_variant_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<VariantSerdeAttrs> {
+    let mut out = VariantSerdeAttrs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
+                out.skip_serializing = true;
+                return Ok(());
+            }
+            if meta.path.is_ident("rename") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.rename = Some(v.value());
+                return Ok(());
+            }
+            if meta.path.is_ident("rename_all") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.rename_all = Some(parse_serde_rename_all(&v.value()).ok_or_else(|| {
+                    Error::new(
+                        v.span(),
+                        format!("unsupported rename_all rule: {}", v.value()),
+                    )
+                })?);
+                return Ok(());
+            }
+            Ok(())
+        })?;
+    }
+
+    Ok(out)
+}
+
+fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<FieldSerdeAttrs> {
+    let mut out = FieldSerdeAttrs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
+                out.skip_serializing = true;
+                return Ok(());
+            }
+            if meta.path.is_ident("rename") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.rename = Some(v.value());
+                return Ok(());
+            }
+            Ok(())
+        })?;
+    }
+
+    Ok(out)
+}
+
+fn type_def_to_typeexpr(
+    input: &DeriveInput,
+    container: &ContainerSerdeAttrs,
+) -> syn::Result<TokenStream2> {
+    match &input.data {
+        Data::Struct(ds) => struct_to_typeexpr(&input.ident, ds, container),
+        Data::Enum(de) => enum_to_typeexpr(&input.ident, de, container),
+        Data::Union(u) => Err(Error::new(
+            u.union_token.span(),
+            "SerdeSchema does not support unions",
+        )),
+    }
+}
+
+fn struct_to_typeexpr(
+    ident: &syn::Ident,
+    ds: &DataStruct,
+    container: &ContainerSerdeAttrs,
+) -> syn::Result<TokenStream2> {
+    // Container rename affects the "type name" we store.
+    let name = container
+        .rename
+        .clone()
+        .unwrap_or_else(|| ident.to_string());
+    let name_ts = quote_some_string(&name);
+
+    match &ds.fields {
+        Fields::Unit => Ok(quote! {
+            ::serde_schema::expr::TypeExpr::UnitStruct { name: ::std::string::String::from(#name) }
+        }),
+        Fields::Unnamed(fields) => {
+            if fields.unnamed.len() == 1 && container.transparent {
+                // `#[serde(transparent)]` newtype struct: serialize as inner.
+                let inner_ty = &fields.unnamed[0].ty;
+                return Ok(type_to_typeexpr(inner_ty));
+            }
+
+            if fields.unnamed.len() == 1 {
+                let inner = type_to_typeexpr(&fields.unnamed[0].ty);
+                return Ok(quote! {
+                    ::serde_schema::expr::TypeExpr::NewtypeStruct {
+                        name: ::std::string::String::from(#name),
+                        inner: ::std::boxed::Box::new(#inner),
+                    }
+                });
+            }
+
+            let elems = fields
+                .unnamed
+                .iter()
+                .map(|f| type_to_typeexpr(&f.ty))
+                .collect::<Vec<_>>();
+            Ok(quote! {
+                ::serde_schema::expr::TypeExpr::TupleStruct {
+                    name: ::std::string::String::from(#name),
+                    elements: vec![#(#elems),*],
+                }
+            })
+        }
+        Fields::Named(fields) => {
+            let mut field_exprs = Vec::new();
+            for f in &fields.named {
+                let f_ident = f
+                    .ident
+                    .as_ref()
+                    .ok_or_else(|| Error::new(f.span(), "missing field ident"))?;
+                let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                if f_attrs.skip_serializing {
+                    continue;
+                }
+
+                let original = f_ident.to_string();
+                let has_rename = f_attrs.rename.is_some();
+                let mut ser_name = f_attrs.rename.unwrap_or_else(|| original.clone());
+                if !has_rename {
+                    if let Some(rule) = container.rename_all {
+                        ser_name = apply_rename_all(rule, &original);
+                    }
+                }
+
+                let ty_expr = type_to_typeexpr(&f.ty);
+                field_exprs.push(quote! {
+                    ::serde_schema::expr::Field::new(#ser_name, #ty_expr)
+                });
+            }
+
+            Ok(quote! {
+                ::serde_schema::expr::TypeExpr::Struct {
+                    name: #name_ts,
+                    fields: vec![#(#field_exprs),*],
+                }
+            })
+        }
+    }
+}
+
+fn enum_to_typeexpr(
+    ident: &syn::Ident,
+    de: &DataEnum,
+    container: &ContainerSerdeAttrs,
+) -> syn::Result<TokenStream2> {
+    let name = container
+        .rename
+        .clone()
+        .unwrap_or_else(|| ident.to_string());
+    let name_ts = quote_some_string(&name);
+
+    let mut variants_ts = Vec::new();
+    for v in &de.variants {
+        let v_attrs = parse_variant_serde_attrs(&v.attrs)?;
+        if v_attrs.skip_serializing {
+            continue;
+        }
+
+        let original_vname = v.ident.to_string();
+        let has_rename = v_attrs.rename.is_some();
+        let mut ser_vname = v_attrs.rename.unwrap_or_else(|| original_vname.clone());
+        if !has_rename {
+            if let Some(rule) = container.rename_all {
+                ser_vname = apply_rename_all(rule, &original_vname);
+            }
+        }
+
+        let kind_ts = match &v.fields {
+            Fields::Unit => quote! { ::serde_schema::expr::VariantKind::Unit },
+            Fields::Unnamed(fields) => {
+                if fields.unnamed.len() == 1 {
+                    let inner = type_to_typeexpr(&fields.unnamed[0].ty);
+                    quote! { ::serde_schema::expr::VariantKind::Newtype(::std::boxed::Box::new(#inner)) }
+                } else {
+                    let elems = fields
+                        .unnamed
+                        .iter()
+                        .map(|f| type_to_typeexpr(&f.ty))
+                        .collect::<Vec<_>>();
+                    quote! { ::serde_schema::expr::VariantKind::Tuple(vec![#(#elems),*]) }
+                }
+            }
+            Fields::Named(fields) => {
+                let mut field_exprs = Vec::new();
+                for f in &fields.named {
+                    let f_ident = f
+                        .ident
+                        .as_ref()
+                        .ok_or_else(|| Error::new(f.span(), "missing field ident"))?;
+                    let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                    if f_attrs.skip_serializing {
+                        continue;
+                    }
+
+                    let original = f_ident.to_string();
+                    let has_rename = f_attrs.rename.is_some();
+                    let mut ser_name = f_attrs.rename.unwrap_or_else(|| original.clone());
+                    if !has_rename {
+                        if let Some(rule) = v_attrs.rename_all {
+                            ser_name = apply_rename_all(rule, &original);
+                        }
+                    }
+
+                    let ty_expr = type_to_typeexpr(&f.ty);
+                    field_exprs.push(quote! {
+                        ::serde_schema::expr::Field::new(#ser_name, #ty_expr)
+                    });
+                }
+
+                quote! { ::serde_schema::expr::VariantKind::Struct(vec![#(#field_exprs),*]) }
+            }
+        };
+
+        variants_ts.push(quote! {
+            ::serde_schema::expr::EnumVariant::new(#ser_vname, #kind_ts)
+        });
+    }
+
+    Ok(quote! {
+        ::serde_schema::expr::TypeExpr::Enum {
+            name: #name_ts,
+            variants: vec![#(#variants_ts),*],
+        }
+    })
+}
+
+fn quote_some_string(s: &str) -> TokenStream2 {
+    quote! { ::std::option::Option::Some(::std::string::String::from(#s)) }
+}
+
+fn apply_rename_all(case: Case, s: &str) -> String {
+    s.to_case(case)
+}
+
+fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
+    // Strip references / groups / parens.
+    match ty {
+        Type::Reference(r) => return type_to_typeexpr(&r.elem),
+        Type::Group(g) => return type_to_typeexpr(&g.elem),
+        Type::Paren(p) => return type_to_typeexpr(&p.elem),
+        _ => {}
+    }
+
+    // Unit: `()`
+    if let Type::Tuple(t) = ty {
+        if t.elems.is_empty() {
+            return quote! { ::serde_schema::expr::TypeExpr::Unit };
+        }
+        let elems = t.elems.iter().map(type_to_typeexpr).collect::<Vec<_>>();
+        return quote! { ::serde_schema::expr::TypeExpr::Tuple { elements: vec![#(#elems),*] } };
+    }
+
+    // Arrays / slices.
+    if let Type::Slice(s) = ty {
+        if is_u8(&s.elem) {
+            return quote! { ::serde_schema::expr::TypeExpr::Bytes };
+        }
+        let elem = type_to_typeexpr(&s.elem);
+        return quote! { ::serde_schema::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
+    }
+
+    if let Type::Array(a) = ty {
+        if is_u8(&a.elem) {
+            return quote! { ::serde_schema::expr::TypeExpr::Bytes };
+        }
+        let elem = type_to_typeexpr(&a.elem);
+        if let syn::Expr::Lit(lit) = &a.len {
+            if let syn::Lit::Int(n) = &lit.lit {
+                if let Ok(n) = n.base10_parse::<usize>() {
+                    return quote! {
+                        ::serde_schema::expr::TypeExpr::Tuple { elements: vec![#elem; #n] }
+                    };
+                }
+            }
+        }
+        return quote! { ::serde_schema::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
+    }
+
+    // Path types.
+    if let Type::Path(p) = ty {
+        let last = p
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+
+        // Primitives
+        if let Some(pt) = primitive_from_ident(&last) {
+            return quote! { ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::#pt) };
+        }
+
+        // `String` / `str`
+        if last == "String" || last == "str" {
+            return quote! { ::serde_schema::expr::TypeExpr::String };
+        }
+
+        // Box<T> serializes as T.
+        if last == "Box" {
+            if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                return type_to_typeexpr(inner);
+            }
+        }
+
+        // Option<T>
+        if last == "Option" {
+            if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                let inner = type_to_typeexpr(inner);
+                return quote! { ::serde_schema::expr::TypeExpr::Option(::std::boxed::Box::new(#inner)) };
+            }
+        }
+
+        // Vec<T>
+        if last == "Vec" {
+            if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                if is_u8(inner) {
+                    return quote! { ::serde_schema::expr::TypeExpr::Bytes };
+                }
+                let inner = type_to_typeexpr(inner);
+                return quote! { ::serde_schema::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#inner) } };
+            }
+        }
+
+        // HashMap<K,V> / BTreeMap<K,V>
+        if last == "HashMap" || last == "BTreeMap" {
+            if let Some((k, v)) = two_type_args(p.path.segments.last().unwrap()) {
+                let k = type_to_typeexpr(k);
+                let v = type_to_typeexpr(v);
+                return quote! {
+                    ::serde_schema::expr::TypeExpr::Map {
+                        key: ::std::boxed::Box::new(#k),
+                        value: ::std::boxed::Box::new(#v),
+                    }
+                };
+            }
+        }
+
+        // Fallback: delegate to `SerdeSchema` of the referenced type.
+        return quote! { <#ty as ::serde_schema::SerdeSchema>::serde_schema() };
+    }
+
+    // Fallback for unsupported syn::Type forms.
+    let msg = format!("unsupported type for SerdeSchema: {:?}", ty);
+    let lit = LitStr::new(&msg, Span::call_site());
+    quote! { compile_error!(#lit) }
+}
+
+fn primitive_from_ident(ident: &str) -> Option<syn::Ident> {
+    let p = match ident {
+        "bool" => "Bool",
+        "i8" => "I8",
+        "i16" => "I16",
+        "i32" => "I32",
+        "i64" => "I64",
+        "i128" => "I128",
+        "u8" => "U8",
+        "u16" => "U16",
+        "u32" => "U32",
+        "u64" => "U64",
+        "u128" => "U128",
+        "f32" => "F32",
+        "f64" => "F64",
+        "char" => "Char",
+        _ => return None,
+    };
+    Some(syn::Ident::new(p, Span::call_site()))
+}
+
+fn is_u8(ty: &Type) -> bool {
+    matches!(ty, Type::Path(p) if p.path.segments.last().is_some_and(|s| s.ident == "u8"))
+}
+
+fn first_type_arg(seg: &syn::PathSegment) -> Option<&Type> {
+    let PathArguments::AngleBracketed(args) = &seg.arguments else {
+        return None;
+    };
+    for a in &args.args {
+        if let syn::GenericArgument::Type(t) = a {
+            return Some(t);
+        }
+    }
+    None
+}
+
+fn two_type_args(seg: &syn::PathSegment) -> Option<(&Type, &Type)> {
+    let PathArguments::AngleBracketed(args) = &seg.arguments else {
+        return None;
+    };
+    let mut it = args.args.iter().filter_map(|a| match a {
+        syn::GenericArgument::Type(t) => Some(t),
+        _ => None,
+    });
+    let a = it.next()?;
+    let b = it.next()?;
+    Some((a, b))
+}
