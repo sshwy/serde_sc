@@ -214,3 +214,25 @@ fn test_tuple_struct() {
     };
     check_struct_to_typeexpr("struct Tup(u8, i32);", expected);
 }
+
+#[test]
+fn test_struct_rename_attr() {
+    let input = r#"
+        #[serde(rename = "Renamed")]
+        struct S {
+            a: u8,
+        }
+    "#;
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("Renamed"),
+            fields: vec![
+                ::serde_schema::expr::Field::new(
+                    "a",
+                    ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                )
+            ],
+        }
+    };
+    check_struct_to_typeexpr(input, expected);
+}
