@@ -396,3 +396,48 @@ fn test_enum_tag_attr_rejects_tuple_variant() {
     let msg = err.to_string();
     assert!(msg.contains("tag"), "msg was: {msg}");
 }
+
+#[test]
+fn test_enum_external_repr() {
+    let input = r#"
+        enum E {
+            Unit,
+            New(u8),
+            Tup(u8, i32),
+            Struct { a: u8 },
+        }
+    "#;
+
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Enum {
+            name: ::std::borrow::Cow::Borrowed("E"),
+            tag: ::std::option::Option::None,
+            variants: vec![
+                ::serde_schema::expr::EnumVariant::new("Unit", ::serde_schema::expr::VariantKind::Unit),
+                ::serde_schema::expr::EnumVariant::new(
+                    "New",
+                    ::serde_schema::expr::VariantKind::Newtype(::std::boxed::Box::new(
+                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                    ))
+                ),
+                ::serde_schema::expr::EnumVariant::new(
+                    "Tup",
+                    ::serde_schema::expr::VariantKind::Tuple(vec![
+                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8),
+                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::I32)
+                    ])
+                ),
+                ::serde_schema::expr::EnumVariant::new("Struct", {
+                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
+                    __fields.push(::serde_schema::expr::Field::new(
+                        "a",
+                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                    ));
+                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                })
+            ],
+        }
+    };
+
+    check_enum_to_typeexpr(input, expected);
+}
