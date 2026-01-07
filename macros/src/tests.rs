@@ -236,3 +236,29 @@ fn test_struct_rename_attr() {
     };
     check_struct_to_typeexpr(input, expected);
 }
+
+#[test]
+fn test_newtype_struct_transparent_attr() {
+    let input = r#"
+        #[serde(transparent)]
+        struct Wrap(u32);
+    "#;
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+    };
+    check_struct_to_typeexpr(input, expected);
+}
+
+#[test]
+fn test_braced_struct_transparent_attr() {
+    let input = r#"
+        #[serde(transparent)]
+        struct Wrap {
+            a: u32,
+        }
+    "#;
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+    };
+    check_struct_to_typeexpr(input, expected);
+}
