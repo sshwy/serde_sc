@@ -101,6 +101,12 @@ fn struct_to_typeexpr(
             ::serde_schema::expr::TypeExpr::UnitStruct { name: #name_ts }
         }),
         Fields::Unnamed(fields) => {
+            if container.transparent && fields.unnamed.len() != 1 {
+                return Err(Error::new(
+                    fields.span(),
+                    "#[serde(transparent)] requires exactly one field",
+                ));
+            }
             if fields.unnamed.len() == 1 && container.transparent {
                 // `#[serde(transparent)]` newtype struct: serialize as inner.
                 let inner_ty = &fields.unnamed[0].ty;
@@ -130,6 +136,25 @@ fn struct_to_typeexpr(
             })
         }
         Fields::Named(fields) => {
+            if container.transparent {
+                let mut non_skipped = Vec::new();
+                for f in &fields.named {
+                    let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                    if !f_attrs.skip_serializing {
+                        non_skipped.push(f);
+                    }
+                }
+
+                if non_skipped.len() != 1 {
+                    return Err(Error::new(
+                        fields.span(),
+                        "#[serde(transparent)] requires exactly one field",
+                    ));
+                }
+
+                return Ok(type_to_typeexpr(&non_skipped[0].ty));
+            }
+
             let mut field_exprs = Vec::new();
             for f in &fields.named {
                 let f_ident = f
