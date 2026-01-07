@@ -7,6 +7,7 @@ pub(crate) struct ContainerSerdeAttrs {
     pub(crate) rename_all: Option<Case<'static>>,
     pub(crate) transparent: bool,
     pub(crate) untagged: bool,
+    pub(crate) tag: Option<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -56,6 +57,11 @@ pub(crate) fn parse_container_serde_attrs(
                 out.untagged = true;
                 return Ok(());
             }
+            if meta.path.is_ident("tag") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.tag = Some(v.value());
+                return Ok(());
+            }
             if meta.path.is_ident("rename") {
                 let v: LitStr = meta.value()?.parse()?;
                 out.rename = Some(v.value());
@@ -93,6 +99,12 @@ pub(crate) fn parse_variant_serde_attrs(
                 return Err(Error::new(
                     meta.path.span(),
                     "serde_schema: #[serde(untagged)] is not supported",
+                ));
+            }
+            if meta.path.is_ident("tag") {
+                return Err(Error::new(
+                    meta.path.span(),
+                    "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {
@@ -134,6 +146,12 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
                 return Err(Error::new(
                     meta.path.span(),
                     "serde_schema: #[serde(untagged)] is not supported",
+                ));
+            }
+            if meta.path.is_ident("tag") {
+                return Err(Error::new(
+                    meta.path.span(),
+                    "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
                 ));
             }
             if meta.path.is_ident("skip") || meta.path.is_ident("skip_serializing") {

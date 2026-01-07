@@ -126,6 +126,9 @@ pub enum TypeExpr {
     /// `tuple_variant` / `struct_variant`).
     Enum {
         name: IdentExpr,
+        /// If present, this enum is *internally tagged* with the given field name
+        /// (i.e. `#[serde(tag = "...")]`).
+        tag: Option<IdentExpr>,
         variants: Vec<EnumVariant>,
     },
 }

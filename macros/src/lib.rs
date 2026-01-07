@@ -89,6 +89,13 @@ fn struct_to_typeexpr(
     ds: &DataStruct,
     container: &ContainerSerdeAttrs,
 ) -> syn::Result<TokenStream2> {
+    if container.tag.is_some() {
+        return Err(Error::new(
+            ident.span(),
+            "serde_schema: #[serde(tag = ...)] is only supported on enum containers",
+        ));
+    }
+
     // Container rename affects the "type name" we store.
     let name = container
         .rename
@@ -180,12 +187,31 @@ fn enum_to_typeexpr(
             "serde_schema: #[serde(untagged)] is not supported",
         ));
     }
+    if container.tag.is_some() {
+        // `#[serde(tag = "...")]` (internally tagged) only supports unit and struct variants.
+        for v in &de.variants {
+            match &v.fields {
+                Fields::Unit | Fields::Named(_) => {}
+                Fields::Unnamed(_) => {
+                    return Err(Error::new(
+                        v.span(),
+                        "serde_schema: #[serde(tag = ...)] is only supported for enums with unit/struct variants",
+                    ));
+                }
+            }
+        }
+    }
 
     let name = container
         .rename
         .clone()
         .unwrap_or_else(|| ident.to_string());
     let name_ts = quote_identexpr(&name);
+    let tag_ts = container
+        .tag
+        .as_deref()
+        .map(|t| quote! { ::std::option::Option::Some(::std::borrow::Cow::Borrowed(#t)) })
+        .unwrap_or_else(|| quote! { ::std::option::Option::None });
 
     let mut variants_ts = Vec::new();
     for v in &de.variants {
@@ -237,6 +263,7 @@ fn enum_to_typeexpr(
     Ok(quote! {
         ::serde_schema::expr::TypeExpr::Enum {
             name: #name_ts,
+            tag: #tag_ts,
             variants: vec![#(#variants_ts),*],
         }
     })

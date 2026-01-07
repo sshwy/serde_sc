@@ -1,7 +1,9 @@
 use quote::quote;
 use syn::{Data, DeriveInput};
 
-use crate::{expand_serde_schema, parse_container_serde_attrs, struct_to_typeexpr};
+use crate::{
+    enum_to_typeexpr, expand_serde_schema, parse_container_serde_attrs, struct_to_typeexpr,
+};
 
 fn check_struct_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
     let input: DeriveInput = syn::parse_str(input).expect("parse input");
@@ -13,6 +15,19 @@ fn check_struct_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
     };
 
     let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+    assert_eq!(got.to_string(), expected.to_string());
+}
+
+fn check_enum_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
+    let input: DeriveInput = syn::parse_str(input).expect("parse input");
+    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
+
+    let de = match &input.data {
+        Data::Enum(de) => de,
+        _ => panic!("expected enum"),
+    };
+
+    let got = enum_to_typeexpr(&input.ident, de, &container).expect("enum_to_typeexpr");
     assert_eq!(got.to_string(), expected.to_string());
 }
 
@@ -300,6 +315,23 @@ fn test_struct_flatten_attr() {
 }
 
 #[test]
+fn test_struct_tag_attr_errors() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        #[serde(tag = "type")]
+        struct S {
+            a: u8,
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    let err = expand_serde_schema(&input).expect_err("expected error");
+    let msg = err.to_string();
+    assert!(msg.contains("tag"), "msg was: {msg}");
+}
+
+#[test]
 fn test_enum_untagged_attr_errors() {
     let input: DeriveInput = syn::parse_str(
         r#"
@@ -315,4 +347,52 @@ fn test_enum_untagged_attr_errors() {
     let err = expand_serde_schema(&input).expect_err("expected error");
     let msg = err.to_string();
     assert!(msg.contains("untagged"), "msg was: {msg}");
+}
+
+#[test]
+fn test_enum_tag_attr() {
+    let input = r#"
+        #[serde(tag = "type")]
+        enum E {
+            A { a: u8 },
+            B,
+        }
+    "#;
+
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Enum {
+            name: ::std::borrow::Cow::Borrowed("E"),
+            tag: ::std::option::Option::Some(::std::borrow::Cow::Borrowed("type")),
+            variants: vec![
+                ::serde_schema::expr::EnumVariant::new("A", {
+                    let mut __fields: ::std::vec::Vec<::serde_schema::expr::Field> = ::std::vec::Vec::new();
+                    __fields.push(::serde_schema::expr::Field::new(
+                        "a",
+                        ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U8)
+                    ));
+                    ::serde_schema::expr::VariantKind::Struct(__fields)
+                }),
+                ::serde_schema::expr::EnumVariant::new("B", ::serde_schema::expr::VariantKind::Unit)
+            ],
+        }
+    };
+
+    check_enum_to_typeexpr(input, expected);
+}
+
+#[test]
+fn test_enum_tag_attr_rejects_tuple_variant() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        #[serde(tag = "type")]
+        enum E {
+            A(u8),
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    let err = expand_serde_schema(&input).expect_err("expected error");
+    let msg = err.to_string();
+    assert!(msg.contains("tag"), "msg was: {msg}");
 }
