@@ -182,3 +182,77 @@ fn test_map_in_struct() {
 
     assert_eq!(got.to_string(), expected.to_string());
 }
+
+#[test]
+fn test_unit_in_struct() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        struct S {
+            a: (),
+        }
+        "#,
+    )
+    .expect("parse input");
+    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
+
+    let ds = match &input.data {
+        Data::Struct(ds) => ds,
+        _ => panic!("expected struct"),
+    };
+
+    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("S"),
+            fields: vec![
+                ::serde_schema::expr::Field::new("a", ::serde_schema::expr::TypeExpr::Unit)
+            ],
+        }
+    };
+
+    assert_eq!(got.to_string(), expected.to_string());
+}
+
+#[test]
+fn test_option_in_struct() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        struct S {
+            a: Option<u32>,
+            b: Option<Vec<u8>>,
+        }
+        "#,
+    )
+    .expect("parse input");
+    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
+
+    let ds = match &input.data {
+        Data::Struct(ds) => ds,
+        _ => panic!("expected struct"),
+    };
+
+    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+    let expected = quote! {
+        ::serde_schema::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("S"),
+            fields: vec![
+                ::serde_schema::expr::Field::new(
+                    "a",
+                    ::serde_schema::expr::TypeExpr::Option(
+                        ::std::boxed::Box::new(
+                            ::serde_schema::expr::TypeExpr::Primitive(::serde_schema::expr::PrimitiveType::U32)
+                        )
+                    )
+                ),
+                ::serde_schema::expr::Field::new(
+                    "b",
+                    ::serde_schema::expr::TypeExpr::Option(
+                        ::std::boxed::Box::new(::serde_schema::expr::TypeExpr::Bytes)
+                    )
+                )
+            ],
+        }
+    };
+
+    assert_eq!(got.to_string(), expected.to_string());
+}
