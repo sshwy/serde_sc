@@ -3,9 +3,8 @@ use syn::{Data, DeriveInput};
 
 use crate::{parse_container_serde_attrs, struct_to_typeexpr};
 
-#[test]
-fn test_unit_struct() {
-    let input: DeriveInput = syn::parse_str("struct Unit;").expect("parse input");
+fn check_struct_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
+    let input: DeriveInput = syn::parse_str(input).expect("parse input");
     let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
 
     let ds = match &input.data {
@@ -14,19 +13,22 @@ fn test_unit_struct() {
     };
 
     let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+    assert_eq!(got.to_string(), expected.to_string());
+}
+
+#[test]
+fn test_unit_struct() {
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::UnitStruct {
             name: ::std::borrow::Cow::Borrowed("Unit")
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr("struct Unit;", expected);
 }
 
 #[test]
 fn test_primitive_fields_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: bool,
             b: i8,
@@ -43,17 +45,7 @@ fn test_primitive_fields_in_struct() {
             m: f64,
             n: char,
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -75,29 +67,17 @@ fn test_primitive_fields_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_string_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: String,
             b: &'static str,
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -107,14 +87,12 @@ fn test_string_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_seq_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: Vec<i32>,
             b: Vec<u8>,
@@ -123,17 +101,7 @@ fn test_seq_in_struct() {
             e: &'static [i32],
             f: &'static [u8],
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -147,29 +115,17 @@ fn test_seq_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_map_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: std::collections::HashMap<String, u8>,
             b: std::collections::BTreeMap<u32, Vec<u8>>,
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -179,28 +135,16 @@ fn test_map_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_unit_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: (),
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -209,29 +153,17 @@ fn test_unit_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_option_in_struct() {
-    let input: DeriveInput = syn::parse_str(
-        r#"
+    let input = r#"
         struct S {
             a: Option<u32>,
             b: Option<Vec<u8>>,
         }
-        "#,
-    )
-    .expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+        "#;
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::Struct {
             name: ::std::borrow::Cow::Borrowed("S"),
@@ -253,21 +185,11 @@ fn test_option_in_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr(input, expected);
 }
 
 #[test]
 fn test_newtype_struct() {
-    let input: DeriveInput = syn::parse_str("struct New(u8);").expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::NewtypeStruct {
             name: ::std::borrow::Cow::Borrowed("New"),
@@ -276,21 +198,11 @@ fn test_newtype_struct() {
             ),
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr("struct New(u8);", expected);
 }
 
 #[test]
 fn test_tuple_struct() {
-    let input: DeriveInput = syn::parse_str("struct Tup(u8, i32);").expect("parse input");
-    let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
-
-    let ds = match &input.data {
-        Data::Struct(ds) => ds,
-        _ => panic!("expected struct"),
-    };
-
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
     let expected = quote! {
         ::serde_schema::expr::TypeExpr::TupleStruct {
             name: ::std::borrow::Cow::Borrowed("Tup"),
@@ -300,6 +212,5 @@ fn test_tuple_struct() {
             ],
         }
     };
-
-    assert_eq!(got.to_string(), expected.to_string());
+    check_struct_to_typeexpr("struct Tup(u8, i32);", expected);
 }
