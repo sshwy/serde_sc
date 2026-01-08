@@ -16,15 +16,15 @@ use syn::{
 };
 
 use crate::attrs::{
-    ContainerSerdeAttrs, parse_container_serde_attrs, parse_field_serde_attrs,
-    parse_variant_serde_attrs,
+    ContainerSerdeAttrs, parse_container_serde_attrs, parse_container_serde_sc_attrs,
+    parse_field_serde_attrs, parse_variant_serde_attrs,
 };
 
 /// Derive macro that generates an implementation of `serde_sc::SerdeSchema`.
 ///
 /// It inspects struct/enum fields and a subset of Serde attributes
 /// (see <https://serde.rs/attributes.html>), then produces `TypeExpr` construction code.
-#[proc_macro_derive(SerdeSchema, attributes(serde))]
+#[proc_macro_derive(SerdeSchema, attributes(serde, serde_sc))]
 pub fn derive_serde_schema(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match expand_serde_schema(&input) {
@@ -39,22 +39,28 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let mut where_clause = where_clause.cloned();
-    add_serde_schema_bounds(&mut where_clause, &input.generics);
+    let sc = parse_container_serde_sc_attrs(&input.attrs)?;
+    let sc = &sc.crate_path;
+    add_serde_schema_bounds(&mut where_clause, &input.generics, sc);
 
     let container = parse_container_serde_attrs(&input.attrs)?;
 
-    let body_expr = type_def_to_typeexpr(input, &container)?;
+    let body_expr = type_def_to_typeexpr(input, &container, sc)?;
 
     Ok(quote! {
-        impl #impl_generics ::serde_sc::SerdeSchema for #ident #ty_generics #where_clause {
-            fn serde_sc() -> ::serde_sc::expr::TypeExpr {
+        impl #impl_generics #sc::SerdeSchema for #ident #ty_generics #where_clause {
+            fn serde_sc() -> #sc::expr::TypeExpr {
                 #body_expr
             }
         }
     })
 }
 
-fn add_serde_schema_bounds(where_clause: &mut Option<syn::WhereClause>, generics: &syn::Generics) {
+fn add_serde_schema_bounds(
+    where_clause: &mut Option<syn::WhereClause>,
+    generics: &syn::Generics,
+    sc: &syn::Path,
+) {
     let wc = where_clause.get_or_insert_with(|| syn::WhereClause {
         where_token: Default::default(),
         predicates: Default::default(),
@@ -66,17 +72,18 @@ fn add_serde_schema_bounds(where_clause: &mut Option<syn::WhereClause>, generics
         };
         let ident = &ty.ident;
         wc.predicates
-            .push(syn::parse_quote!(#ident: ::serde_sc::SerdeSchema));
+            .push(syn::parse_quote!(#ident: #sc::SerdeSchema));
     }
 }
 
 fn type_def_to_typeexpr(
     input: &DeriveInput,
     container: &ContainerSerdeAttrs,
+    sc: &syn::Path,
 ) -> syn::Result<TokenStream2> {
     match &input.data {
-        Data::Struct(ds) => struct_to_typeexpr(&input.ident, ds, container),
-        Data::Enum(de) => enum_to_typeexpr(&input.ident, de, container),
+        Data::Struct(ds) => struct_to_typeexpr(&input.ident, ds, container, sc),
+        Data::Enum(de) => enum_to_typeexpr(&input.ident, de, container, sc),
         Data::Union(u) => Err(Error::new(
             u.union_token.span(),
             "SerdeSchema does not support unions",
@@ -88,6 +95,7 @@ fn struct_to_typeexpr(
     ident: &syn::Ident,
     ds: &DataStruct,
     container: &ContainerSerdeAttrs,
+    sc: &syn::Path,
 ) -> syn::Result<TokenStream2> {
     if container.tag.is_some() || container.content.is_some() {
         return Err(Error::new(
@@ -105,7 +113,7 @@ fn struct_to_typeexpr(
 
     match &ds.fields {
         Fields::Unit => Ok(quote! {
-            ::serde_sc::expr::TypeExpr::UnitStruct { name: #name_ts }
+            #sc::expr::TypeExpr::UnitStruct { name: #name_ts }
         }),
         Fields::Unnamed(fields) => {
             if container.transparent && fields.unnamed.len() != 1 {
@@ -117,13 +125,13 @@ fn struct_to_typeexpr(
             if fields.unnamed.len() == 1 && container.transparent {
                 // `#[serde(transparent)]` newtype struct: serialize as inner.
                 let inner_ty = &fields.unnamed[0].ty;
-                return Ok(type_to_typeexpr(inner_ty));
+                return Ok(type_to_typeexpr(inner_ty, sc));
             }
 
             if fields.unnamed.len() == 1 {
-                let inner = type_to_typeexpr(&fields.unnamed[0].ty);
+                let inner = type_to_typeexpr(&fields.unnamed[0].ty, sc);
                 return Ok(quote! {
-                    ::serde_sc::expr::TypeExpr::NewtypeStruct {
+                    #sc::expr::TypeExpr::NewtypeStruct {
                         name: #name_ts,
                         inner: ::std::boxed::Box::new(#inner),
                     }
@@ -133,10 +141,10 @@ fn struct_to_typeexpr(
             let elems = fields
                 .unnamed
                 .iter()
-                .map(|f| type_to_typeexpr(&f.ty))
+                .map(|f| type_to_typeexpr(&f.ty, sc))
                 .collect::<Vec<_>>();
             Ok(quote! {
-                ::serde_sc::expr::TypeExpr::TupleStruct {
+                #sc::expr::TypeExpr::TupleStruct {
                     name: #name_ts,
                     elements: vec![#(#elems),*],
                 }
@@ -159,15 +167,15 @@ fn struct_to_typeexpr(
                     ));
                 }
 
-                return Ok(type_to_typeexpr(&non_skipped[0].ty));
+                return Ok(type_to_typeexpr(&non_skipped[0].ty, sc));
             }
 
-            let field_stmts = named_fields_to_field_stmts(fields, container.rename_all)?;
+            let field_stmts = named_fields_to_field_stmts(fields, container.rename_all, sc)?;
 
             Ok(quote! {{
-                let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+                let mut __fields: ::std::vec::Vec<#sc::expr::Field> = ::std::vec::Vec::new();
                 #(#field_stmts)*
-                ::serde_sc::expr::TypeExpr::Struct {
+                #sc::expr::TypeExpr::Struct {
                     name: #name_ts,
                     fields: __fields,
                 }
@@ -180,6 +188,7 @@ fn enum_to_typeexpr(
     ident: &syn::Ident,
     de: &DataEnum,
     container: &ContainerSerdeAttrs,
+    sc: &syn::Path,
 ) -> syn::Result<TokenStream2> {
     if container.untagged {
         return Err(Error::new(
@@ -243,38 +252,38 @@ fn enum_to_typeexpr(
         }
 
         let kind_ts = match &v.fields {
-            Fields::Unit => quote! { ::serde_sc::expr::VariantKind::Unit },
+            Fields::Unit => quote! { #sc::expr::VariantKind::Unit },
             Fields::Unnamed(fields) => {
                 if fields.unnamed.len() == 1 {
-                    let inner = type_to_typeexpr(&fields.unnamed[0].ty);
-                    quote! { ::serde_sc::expr::VariantKind::Newtype(::std::boxed::Box::new(#inner)) }
+                    let inner = type_to_typeexpr(&fields.unnamed[0].ty, sc);
+                    quote! { #sc::expr::VariantKind::Newtype(::std::boxed::Box::new(#inner)) }
                 } else {
                     let elems = fields
                         .unnamed
                         .iter()
-                        .map(|f| type_to_typeexpr(&f.ty))
+                        .map(|f| type_to_typeexpr(&f.ty, sc))
                         .collect::<Vec<_>>();
-                    quote! { ::serde_sc::expr::VariantKind::Tuple(vec![#(#elems),*]) }
+                    quote! { #sc::expr::VariantKind::Tuple(vec![#(#elems),*]) }
                 }
             }
             Fields::Named(fields) => {
-                let field_stmts = named_fields_to_field_stmts(fields, v_attrs.rename_all)?;
+                let field_stmts = named_fields_to_field_stmts(fields, v_attrs.rename_all, sc)?;
 
                 quote! {{
-                    let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+                    let mut __fields: ::std::vec::Vec<#sc::expr::Field> = ::std::vec::Vec::new();
                     #(#field_stmts)*
-                    ::serde_sc::expr::VariantKind::Struct(__fields)
+                    #sc::expr::VariantKind::Struct(__fields)
                 }}
             }
         };
 
         variants_ts.push(quote! {
-            ::serde_sc::expr::EnumVariant::new(#ser_vname, #kind_ts)
+            #sc::expr::EnumVariant::new(#ser_vname, #kind_ts)
         });
     }
 
     Ok(quote! {
-        ::serde_sc::expr::TypeExpr::Enum {
+        #sc::expr::TypeExpr::Enum {
             name: #name_ts,
             tag: #tag_ts,
             content: #content_ts,
@@ -296,6 +305,7 @@ fn apply_rename_all(case: Case, s: &str) -> String {
 fn named_fields_to_field_stmts(
     fields: &syn::FieldsNamed,
     rename_all: Option<Case<'static>>,
+    sc: &syn::Path,
 ) -> syn::Result<Vec<TokenStream2>> {
     let mut field_stmts = Vec::new();
 
@@ -323,12 +333,12 @@ fn named_fields_to_field_stmts(
                     "field cannot be both #[serde(flatten)] and #[serde(rename = ...)]",
                 ));
             }
-            let inner = type_to_typeexpr(&f.ty);
+            let inner = type_to_typeexpr(&f.ty, sc);
             field_stmts.push(quote! {
                 {
                     let __inner = #inner;
                     match __inner {
-                        ::serde_sc::expr::TypeExpr::Struct { name: _, fields } => {
+                        #sc::expr::TypeExpr::Struct { name: _, fields } => {
                             __fields.extend(fields);
                         }
                         _other => {
@@ -351,57 +361,61 @@ fn named_fields_to_field_stmts(
             }
         }
 
-        let ty_expr = type_to_typeexpr(&f.ty);
+        let ty_expr = type_to_typeexpr(&f.ty, sc);
         field_stmts.push(quote! {
-            __fields.push(::serde_sc::expr::Field::new(#ser_name, #ty_expr));
+            __fields.push(#sc::expr::Field::new(#ser_name, #ty_expr));
         });
     }
 
     Ok(field_stmts)
 }
 
-fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
+fn type_to_typeexpr(ty: &Type, sc: &syn::Path) -> TokenStream2 {
     // Strip references / groups / parens.
     match ty {
-        Type::Reference(r) => return type_to_typeexpr(&r.elem),
-        Type::Group(g) => return type_to_typeexpr(&g.elem),
-        Type::Paren(p) => return type_to_typeexpr(&p.elem),
+        Type::Reference(r) => return type_to_typeexpr(&r.elem, sc),
+        Type::Group(g) => return type_to_typeexpr(&g.elem, sc),
+        Type::Paren(p) => return type_to_typeexpr(&p.elem, sc),
         _ => {}
     }
 
     // Unit: `()`
     if let Type::Tuple(t) = ty {
         if t.elems.is_empty() {
-            return quote! { ::serde_sc::expr::TypeExpr::Unit };
+            return quote! { #sc::expr::TypeExpr::Unit };
         }
-        let elems = t.elems.iter().map(type_to_typeexpr).collect::<Vec<_>>();
-        return quote! { ::serde_sc::expr::TypeExpr::Tuple { elements: vec![#(#elems),*] } };
+        let elems = t
+            .elems
+            .iter()
+            .map(|t| type_to_typeexpr(t, sc))
+            .collect::<Vec<_>>();
+        return quote! { #sc::expr::TypeExpr::Tuple { elements: vec![#(#elems),*] } };
     }
 
     // Arrays / slices.
     if let Type::Slice(s) = ty {
         if is_u8(&s.elem) {
-            return quote! { ::serde_sc::expr::TypeExpr::Bytes };
+            return quote! { #sc::expr::TypeExpr::Bytes };
         }
-        let elem = type_to_typeexpr(&s.elem);
-        return quote! { ::serde_sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
+        let elem = type_to_typeexpr(&s.elem, sc);
+        return quote! { #sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
     }
 
     if let Type::Array(a) = ty {
         if is_u8(&a.elem) {
-            return quote! { ::serde_sc::expr::TypeExpr::Bytes };
+            return quote! { #sc::expr::TypeExpr::Bytes };
         }
-        let elem = type_to_typeexpr(&a.elem);
+        let elem = type_to_typeexpr(&a.elem, sc);
         if let syn::Expr::Lit(lit) = &a.len {
             if let syn::Lit::Int(n) = &lit.lit {
                 if let Ok(n) = n.base10_parse::<usize>() {
                     return quote! {
-                        ::serde_sc::expr::TypeExpr::Tuple { elements: vec![#elem; #n] }
+                        #sc::expr::TypeExpr::Tuple { elements: vec![#elem; #n] }
                     };
                 }
             }
         }
-        return quote! { ::serde_sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
+        return quote! { #sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#elem) } };
     }
 
     // Path types.
@@ -415,26 +429,26 @@ fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
 
         // Primitives
         if let Some(pt) = primitive_from_ident(&last) {
-            return quote! { ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::#pt) };
+            return quote! { #sc::expr::TypeExpr::Primitive(#sc::expr::PrimitiveType::#pt) };
         }
 
         // `String` / `str`
         if last == "String" || last == "str" {
-            return quote! { ::serde_sc::expr::TypeExpr::String };
+            return quote! { #sc::expr::TypeExpr::String };
         }
 
         // Box<T> serializes as T.
         if last == "Box" {
             if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
-                return type_to_typeexpr(inner);
+                return type_to_typeexpr(inner, sc);
             }
         }
 
         // Option<T>
         if last == "Option" {
             if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
-                let inner = type_to_typeexpr(inner);
-                return quote! { ::serde_sc::expr::TypeExpr::Option(::std::boxed::Box::new(#inner)) };
+                let inner = type_to_typeexpr(inner, sc);
+                return quote! { #sc::expr::TypeExpr::Option(::std::boxed::Box::new(#inner)) };
             }
         }
 
@@ -442,20 +456,20 @@ fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
         if last == "Vec" {
             if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
                 if is_u8(inner) {
-                    return quote! { ::serde_sc::expr::TypeExpr::Bytes };
+                    return quote! { #sc::expr::TypeExpr::Bytes };
                 }
-                let inner = type_to_typeexpr(inner);
-                return quote! { ::serde_sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#inner) } };
+                let inner = type_to_typeexpr(inner, sc);
+                return quote! { #sc::expr::TypeExpr::Seq { element: ::std::boxed::Box::new(#inner) } };
             }
         }
 
         // HashMap<K,V> / BTreeMap<K,V>
         if last == "HashMap" || last == "BTreeMap" {
             if let Some((k, v)) = two_type_args(p.path.segments.last().unwrap()) {
-                let k = type_to_typeexpr(k);
-                let v = type_to_typeexpr(v);
+                let k = type_to_typeexpr(k, sc);
+                let v = type_to_typeexpr(v, sc);
                 return quote! {
-                    ::serde_sc::expr::TypeExpr::Map {
+                    #sc::expr::TypeExpr::Map {
                         key: ::std::boxed::Box::new(#k),
                         value: ::std::boxed::Box::new(#v),
                     }
@@ -464,7 +478,7 @@ fn type_to_typeexpr(ty: &Type) -> TokenStream2 {
         }
 
         // Fallback: delegate to `SerdeSchema` of the referenced type.
-        return quote! { <#ty as ::serde_sc::SerdeSchema>::serde_sc() };
+        return quote! { <#ty as #sc::SerdeSchema>::serde_sc() };
     }
 
     // Fallback for unsupported syn::Type forms.

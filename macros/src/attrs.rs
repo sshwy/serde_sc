@@ -1,5 +1,5 @@
 use convert_case::Case;
-use syn::{Error, LitStr, spanned::Spanned};
+use syn::{Attribute, Error, LitStr, Path, spanned::Spanned};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct ContainerSerdeAttrs {
@@ -25,6 +25,19 @@ pub(crate) struct FieldSerdeAttrs {
     pub(crate) flatten: bool,
 }
 
+#[derive(Clone)]
+pub(crate) struct ContainerSerdeScAttrs {
+    pub(crate) crate_path: Path,
+}
+
+impl Default for ContainerSerdeScAttrs {
+    fn default() -> Self {
+        Self {
+            crate_path: syn::parse_quote!(::serde_sc),
+        }
+    }
+}
+
 fn parse_serde_rename_all(s: &str) -> Option<Case<'static>> {
     Some(match s {
         "lowercase" => Case::Lower,
@@ -37,6 +50,38 @@ fn parse_serde_rename_all(s: &str) -> Option<Case<'static>> {
         "SCREAMING-KEBAB-CASE" => Case::UpperKebab,
         _ => return None,
     })
+}
+
+pub(crate) fn parse_container_serde_sc_attrs(
+    attrs: &[Attribute],
+) -> syn::Result<ContainerSerdeScAttrs> {
+    let mut out = ContainerSerdeScAttrs::default();
+
+    for attr in attrs {
+        if !attr.path().is_ident("serde_sc") {
+            continue;
+        }
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("crate") {
+                let v: LitStr = meta.value()?.parse()?;
+                out.crate_path = syn::parse_str::<Path>(&v.value()).map_err(|e| {
+                    Error::new(
+                        v.span(),
+                        format!("serde_sc: invalid path for #[serde_sc(crate = \"...\")]: {e}"),
+                    )
+                })?;
+                return Ok(());
+            }
+
+            Err(Error::new(
+                meta.path.span(),
+                "serde_sc: unsupported #[serde_sc(...)] attribute",
+            ))
+        })?;
+    }
+
+    Ok(out)
 }
 
 pub(crate) fn parse_container_serde_attrs(

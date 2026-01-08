@@ -2,32 +2,37 @@ use quote::quote;
 use syn::{Data, DeriveInput};
 
 use crate::{
-    enum_to_typeexpr, expand_serde_schema, parse_container_serde_attrs, struct_to_typeexpr,
+    enum_to_typeexpr, expand_serde_schema, parse_container_serde_attrs,
+    parse_container_serde_sc_attrs, struct_to_typeexpr,
 };
 
 fn check_struct_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
     let input: DeriveInput = syn::parse_str(input).expect("parse input");
     let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
+    let sc = parse_container_serde_sc_attrs(&input.attrs).expect("parse serde_sc attrs");
+    let sc = &sc.crate_path;
 
     let ds = match &input.data {
         Data::Struct(ds) => ds,
         _ => panic!("expected struct"),
     };
 
-    let got = struct_to_typeexpr(&input.ident, ds, &container).expect("struct_to_typeexpr");
+    let got = struct_to_typeexpr(&input.ident, ds, &container, sc).expect("struct_to_typeexpr");
     assert_eq!(got.to_string(), expected.to_string());
 }
 
 fn check_enum_to_typeexpr(input: &str, expected: proc_macro2::TokenStream) {
     let input: DeriveInput = syn::parse_str(input).expect("parse input");
     let container = parse_container_serde_attrs(&input.attrs).expect("parse container attrs");
+    let sc = parse_container_serde_sc_attrs(&input.attrs).expect("parse serde_sc attrs");
+    let sc = &sc.crate_path;
 
     let de = match &input.data {
         Data::Enum(de) => de,
         _ => panic!("expected enum"),
     };
 
-    let got = enum_to_typeexpr(&input.ident, de, &container).expect("enum_to_typeexpr");
+    let got = enum_to_typeexpr(&input.ident, de, &container, sc).expect("enum_to_typeexpr");
     assert_eq!(got.to_string(), expected.to_string());
 }
 
@@ -489,4 +494,26 @@ fn test_enum_adjacent_tag_attr() {
     };
 
     check_enum_to_typeexpr(input, expected);
+}
+
+#[test]
+fn test_custom_serde_sc_crate_path() {
+    let input = r#"
+        #[serde_sc(crate = "my::serde_sc")]
+        struct S {
+            a: u8,
+        }
+    "#;
+    let expected = quote! {{
+        let mut __fields: ::std::vec::Vec<my::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(my::serde_sc::expr::Field::new(
+            "a",
+            my::serde_sc::expr::TypeExpr::Primitive(my::serde_sc::expr::PrimitiveType::U8)
+        ));
+        my::serde_sc::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("S"),
+            fields: __fields,
+        }
+    }};
+    check_struct_to_typeexpr(input, expected);
 }
