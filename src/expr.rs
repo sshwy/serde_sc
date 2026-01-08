@@ -77,6 +77,9 @@ pub enum VariantKind {
 /// A type expression capable of representing the Serde data model types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeExpr {
+    /// A reference to a type that implements `SerdeSchema`.
+    Remote { type_id: std::any::TypeId },
+
     /// One of the 14 primitive types.
     Primitive(PrimitiveType),
 

@@ -284,6 +284,32 @@ fn test_braced_struct_transparent_attr() {
 }
 
 #[test]
+fn test_struct_remote_fallback() {
+    let input = r#"
+        struct Outer {
+            inner: Inner,
+            a: u8,
+        }
+    "#;
+    let expected = quote! {{
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new(
+            "inner",
+            ::serde_sc::expr::TypeExpr::Remote { type_id: ::std::any::TypeId::of::<Inner>() }
+        ));
+        __fields.push(::serde_sc::expr::Field::new(
+            "a",
+            ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
+        ));
+        ::serde_sc::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("Outer"),
+            fields: __fields,
+        }
+    }};
+    check_struct_to_typeexpr(input, expected);
+}
+
+#[test]
 fn test_struct_flatten_attr() {
     let input = r#"
         struct Outer {

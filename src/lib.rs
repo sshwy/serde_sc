@@ -1,4 +1,5 @@
 pub mod expr;
+pub mod global;
 pub mod traits;
 
 pub use serde_sc_macros::SerdeSchema;
