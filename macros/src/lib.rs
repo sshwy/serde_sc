@@ -60,7 +60,7 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 expr
             }
 
-            fn on_register(registry: &mut #sc::registry::Registry) {
+            fn on_register(registry: &mut #sc::registry::RegistryContext) {
                 #on_register_body
             }
         }

@@ -1,7 +1,7 @@
 use crate::{
     context::Context,
     expr::{PrimitiveType, TypeExpr},
-    registry::Registry,
+    registry::RegistryContext,
 };
 
 use std::collections::{BTreeMap, HashMap};
@@ -15,7 +15,7 @@ pub trait SerdeSchema: 'static {
     ///
     /// The default implementation only inserts the type schema expression of the implementing type itself.
     /// Override this method to insert dependent types.
-    fn on_register(registry: &mut Registry) {
+    fn on_register(registry: &mut RegistryContext) {
         if registry.is_pending::<Self>() {
             return;
         }
