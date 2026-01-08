@@ -1,4 +1,4 @@
-use serde_sc::SerdeSchema;
+use serde_sc::{SerdeSchema, registry::Registry};
 
 #[derive(SerdeSchema)]
 #[allow(dead_code)]
@@ -10,6 +10,7 @@ struct Person {
 }
 
 #[allow(dead_code)]
+#[derive(SerdeSchema)]
 struct Address {
     street: String,
     city: String,
@@ -26,4 +27,7 @@ struct Info {
 
 fn main() {
     println!("{:?}", Person::type_expr());
+    let mut r = Registry::new();
+    r.register::<Person>();
+    println!("r = {:?}", r);
 }

@@ -46,6 +46,7 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let container = parse_container_serde_attrs(&input.attrs)?;
 
     let body_expr = type_def_to_typeexpr(input, &container, sc)?;
+    let on_register_body = build_on_register_body(input, &container, sc)?;
 
     Ok(quote! {
         impl #impl_generics #sc::SerdeSchema for #ident #ty_generics #where_clause {
@@ -58,8 +59,251 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
                 ctxt.set_pending::<Self>(false);
                 expr
             }
+
+            fn on_register(registry: &mut #sc::registry::Registry) {
+                #on_register_body
+            }
         }
     })
+}
+
+fn build_on_register_body(
+    input: &DeriveInput,
+    container: &ContainerSerdeAttrs,
+    sc: &syn::Path,
+) -> syn::Result<TokenStream2> {
+    let mut deps: Vec<Type> = Vec::new();
+    collect_deps_from_input(input, container, &mut deps)?;
+
+    // De-dup by token string (stable enough for our purposes).
+    let mut uniq: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut dep_calls: Vec<TokenStream2> = Vec::new();
+    for ty in deps {
+        let key = ty.to_token_stream().to_string();
+        if !uniq.insert(key) {
+            continue;
+        }
+        dep_calls.push(quote! {
+            <#ty as #sc::SerdeSchema>::on_register(registry);
+        });
+    }
+
+    Ok(quote! {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        #(#dep_calls)*
+        registry.try_insert_with(::std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.set_pending::<Self>(false);
+    })
+}
+
+fn collect_deps_from_input(
+    input: &DeriveInput,
+    container: &ContainerSerdeAttrs,
+    out: &mut Vec<Type>,
+) -> syn::Result<()> {
+    match &input.data {
+        Data::Struct(ds) => collect_deps_from_struct(ds, container, out),
+        Data::Enum(de) => collect_deps_from_enum(de, container, out),
+        Data::Union(_u) => Ok(()),
+    }
+}
+
+fn collect_deps_from_struct(
+    ds: &DataStruct,
+    container: &ContainerSerdeAttrs,
+    out: &mut Vec<Type>,
+) -> syn::Result<()> {
+    match &ds.fields {
+        Fields::Unit => Ok(()),
+        Fields::Unnamed(fields) => {
+            if container.transparent && fields.unnamed.len() == 1 {
+                collect_custom_types_from_type(&fields.unnamed[0].ty, true, out);
+                return Ok(());
+            }
+            for f in &fields.unnamed {
+                collect_custom_types_from_type(&f.ty, true, out);
+            }
+            Ok(())
+        }
+        Fields::Named(fields) => {
+            if container.transparent {
+                // Same rule as build_type_expr: exactly one non-skipped field.
+                let mut non_skipped: Vec<&syn::Field> = Vec::new();
+                for f in &fields.named {
+                    let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                    if !f_attrs.skip_serializing {
+                        non_skipped.push(f);
+                    }
+                }
+                if non_skipped.len() == 1 {
+                    collect_custom_types_from_type(&non_skipped[0].ty, true, out);
+                    return Ok(());
+                }
+                // If it's invalid, build_type_expr already errors; keep on_register permissive.
+            }
+
+            for f in &fields.named {
+                let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                if f_attrs.skip_serializing {
+                    continue;
+                }
+                if f_attrs.flatten {
+                    // Flatten delegates to the underlying type's SerdeSchema (e.g. Box<T> -> T),
+                    // so register that "flatten target" type.
+                    collect_flatten_target_type(&f.ty, out);
+                    continue;
+                }
+                collect_custom_types_from_type(&f.ty, true, out);
+            }
+            Ok(())
+        }
+    }
+}
+
+fn collect_deps_from_enum(
+    de: &DataEnum,
+    container: &ContainerSerdeAttrs,
+    out: &mut Vec<Type>,
+) -> syn::Result<()> {
+    // Container-level flags don't affect dependency discovery (only what fields are present).
+    let _ = container;
+
+    for v in &de.variants {
+        let v_attrs = parse_variant_serde_attrs(&v.attrs)?;
+        if v_attrs.skip_serializing {
+            continue;
+        }
+
+        match &v.fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => {
+                for f in &fields.unnamed {
+                    collect_custom_types_from_type(&f.ty, true, out);
+                }
+            }
+            Fields::Named(fields) => {
+                for f in &fields.named {
+                    let f_attrs = parse_field_serde_attrs(&f.attrs)?;
+                    if f_attrs.skip_serializing {
+                        continue;
+                    }
+                    if f_attrs.flatten {
+                        collect_flatten_target_type(&f.ty, out);
+                        continue;
+                    }
+                    collect_custom_types_from_type(&f.ty, true, out);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_custom_types_from_type(ty: &Type, allow_remote: bool, out: &mut Vec<Type>) {
+    // Keep this in sync with `type_to_typeexpr`'s type-shape handling.
+    match ty {
+        Type::Reference(r) => return collect_custom_types_from_type(&r.elem, allow_remote, out),
+        Type::Group(g) => return collect_custom_types_from_type(&g.elem, allow_remote, out),
+        Type::Paren(p) => return collect_custom_types_from_type(&p.elem, allow_remote, out),
+        _ => {}
+    }
+
+    if let Type::Tuple(t) = ty {
+        for e in &t.elems {
+            collect_custom_types_from_type(e, true, out);
+        }
+        return;
+    }
+
+    if let Type::Slice(s) = ty {
+        collect_custom_types_from_type(&s.elem, true, out);
+        return;
+    }
+
+    if let Type::Array(a) = ty {
+        collect_custom_types_from_type(&a.elem, true, out);
+        return;
+    }
+
+    if let Type::Path(p) = ty {
+        let last = p
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+
+        if primitive_from_ident(&last).is_some() {
+            return;
+        }
+        if last == "String" || last == "str" {
+            return;
+        }
+        if last == "Box" {
+            if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                collect_custom_types_from_type(inner, allow_remote, out);
+            }
+            return;
+        }
+        if last == "Option" || last == "Vec" {
+            if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                collect_custom_types_from_type(inner, true, out);
+            }
+            return;
+        }
+        if last == "HashMap" || last == "BTreeMap" {
+            if let Some((k, v)) = two_type_args(p.path.segments.last().unwrap()) {
+                collect_custom_types_from_type(k, true, out);
+                collect_custom_types_from_type(v, true, out);
+            }
+            return;
+        }
+
+        if allow_remote {
+            out.push(ty.clone());
+        }
+        return;
+    }
+}
+
+fn collect_flatten_target_type(ty: &Type, out: &mut Vec<Type>) {
+    // Mirror `type_to_typeexpr(..., allow_remote = false)` behavior for flatten:
+    // strip refs/groups/parens and unwrap Box<T>.
+    let mut cur = ty;
+    loop {
+        match cur {
+            Type::Reference(r) => {
+                cur = &r.elem;
+                continue;
+            }
+            Type::Group(g) => {
+                cur = &g.elem;
+                continue;
+            }
+            Type::Paren(p) => {
+                cur = &p.elem;
+                continue;
+            }
+            Type::Path(p) => {
+                let last = p.path.segments.last().map(|s| s.ident.to_string());
+                if last.as_deref() == Some("Box") {
+                    if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
+                        cur = inner;
+                        continue;
+                    }
+                }
+            }
+            _ => {}
+        }
+        break;
+    }
+
+    if matches!(cur, Type::Path(_)) {
+        out.push(cur.clone());
+    }
 }
 
 fn add_serde_schema_bounds(

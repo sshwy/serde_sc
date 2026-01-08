@@ -1,14 +1,28 @@
 use crate::{
     context::Context,
     expr::{PrimitiveType, TypeExpr},
+    registry::Registry,
 };
 
 use std::collections::{BTreeMap, HashMap};
 
 /// Trait for describing how a type maps to a TypeExpr schema for serialization/deserialization.
-pub trait SerdeSchema {
+pub trait SerdeSchema: 'static {
     /// Builds the schema type expression for the implementing type, possibly using and updating the context.
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr;
+
+    /// Registers the type schema expression of the implementing type with the given registry.
+    ///
+    /// The default implementation only inserts the type schema expression of the implementing type itself.
+    /// Override this method to insert dependent types.
+    fn on_register(registry: &mut Registry) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.set_pending::<Self>(false);
+    }
 
     /// Returns the type schema expression using a fresh default context.
     fn type_expr() -> TypeExpr {
