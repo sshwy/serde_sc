@@ -78,7 +78,10 @@ pub enum VariantKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeExpr {
     /// A reference to a type that implements `SerdeSchema`.
-    Remote { type_id: std::any::TypeId },
+    Remote {
+        path: IdentExpr,
+        type_id: std::any::TypeId,
+    },
 
     /// One of the 14 primitive types.
     Primitive(PrimitiveType),

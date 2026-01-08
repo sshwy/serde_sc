@@ -295,7 +295,10 @@ fn test_struct_remote_fallback() {
         let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
         __fields.push(::serde_sc::expr::Field::new(
             "inner",
-            ::serde_sc::expr::TypeExpr::Remote { type_id: ::std::any::TypeId::of::<Inner>() }
+            ::serde_sc::expr::TypeExpr::Remote {
+                path: ::std::borrow::Cow::Borrowed(stringify!(Inner)),
+                type_id: ::std::any::TypeId::of::<Inner>()
+            }
         ));
         __fields.push(::serde_sc::expr::Field::new(
             "a",

@@ -5,6 +5,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
 };
 
+/// Context used during schema building, such as for tracking which types are being processed to prevent infinite recursion.
 #[derive(Debug, Default)]
 pub struct Context {
     pending: HashSet<TypeId>,

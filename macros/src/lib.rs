@@ -485,7 +485,10 @@ fn type_to_typeexpr(ty: &Type, sc: &syn::Path, allow_remote: bool) -> TokenStrea
 
         if allow_remote {
             // Fallback: use TypeExpr::Remote to refer to non-special-cased types by TypeId.
-            return quote! { #sc::expr::TypeExpr::Remote { type_id: ::std::any::TypeId::of::<#ty>() } };
+            return quote! { #sc::expr::TypeExpr::Remote {
+                path: ::std::borrow::Cow::Borrowed(stringify!(#p)),
+                type_id: ::std::any::TypeId::of::<#ty>()
+            } };
         } else {
             // Fallback: delegate to `SerdeSchema` of the referenced type.
             return quote! { <#ty as #sc::SerdeSchema>::build_type_expr(ctxt) };
