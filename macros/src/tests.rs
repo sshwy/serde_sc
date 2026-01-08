@@ -321,7 +321,7 @@ fn test_struct_flatten_attr() {
     let expected = quote! {{
         let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
         {
-            let __inner = <Inner as ::serde_sc::SerdeSchema>::serde_sc();
+            let __inner = <Inner as ::serde_sc::SerdeSchema>::type_expr();
             match __inner {
                 ::serde_sc::expr::TypeExpr::Struct { name: _, fields } => {
                     __fields.extend(fields);

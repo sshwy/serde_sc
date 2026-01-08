@@ -16,7 +16,7 @@ pub fn register<T>()
 where
     T: SerdeSchema + 'static,
 {
-    let type_expr = T::serde_sc();
+    let type_expr = T::type_expr();
     let type_id = std::any::TypeId::of::<T>();
     GLOBAL
         .write()
