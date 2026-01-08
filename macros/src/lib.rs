@@ -49,8 +49,14 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
 
     Ok(quote! {
         impl #impl_generics #sc::SerdeSchema for #ident #ty_generics #where_clause {
-            fn type_expr() -> #sc::expr::TypeExpr {
-                #body_expr
+            fn build_type_expr(ctxt: &mut #sc::Context) -> #sc::expr::TypeExpr {
+                if ctxt.is_pending::<Self>() {
+                    panic!("Recursive type detected: {}", stringify!(#ident #ty_generics));
+                }
+                ctxt.set_pending::<Self>(true);
+                let expr = { #body_expr };
+                ctxt.set_pending::<Self>(false);
+                expr
             }
         }
     })
@@ -482,7 +488,7 @@ fn type_to_typeexpr(ty: &Type, sc: &syn::Path, allow_remote: bool) -> TokenStrea
             return quote! { #sc::expr::TypeExpr::Remote { type_id: ::std::any::TypeId::of::<#ty>() } };
         } else {
             // Fallback: delegate to `SerdeSchema` of the referenced type.
-            return quote! { <#ty as #sc::SerdeSchema>::type_expr() };
+            return quote! { <#ty as #sc::SerdeSchema>::build_type_expr(ctxt) };
         }
     }
 
