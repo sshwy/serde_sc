@@ -49,7 +49,7 @@ fn expand_serde_schema(input: &DeriveInput) -> syn::Result<TokenStream2> {
 
     Ok(quote! {
         impl #impl_generics #sc::SerdeSchema for #ident #ty_generics #where_clause {
-            fn build_type_expr(ctxt: &mut #sc::Context) -> #sc::expr::TypeExpr {
+            fn build_type_expr(ctxt: &mut #sc::context::Context) -> #sc::expr::TypeExpr {
                 if ctxt.is_pending::<Self>() {
                     panic!("Recursive type detected: {}", stringify!(#ident #ty_generics));
                 }
