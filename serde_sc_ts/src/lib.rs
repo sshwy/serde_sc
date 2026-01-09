@@ -1,5 +1,8 @@
-pub mod convert;
 pub mod expr;
 pub mod value;
+pub mod world;
 
-pub use convert::to_typescript;
+#[cfg(test)]
+mod tests;
+
+pub use world::{DeclWorld, Flavor};

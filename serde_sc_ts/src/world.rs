@@ -2,7 +2,7 @@
 
 use std::{
     any::TypeId,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
 };
 
 use crate::{
@@ -11,19 +11,59 @@ use crate::{
 };
 use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
 
-struct NameResolver<'a> {
+pub struct DeclWorld<'a> {
     registry: &'a Registry,
+    names: HashMap<TypeId, String>,
 }
 
-impl<'a> NameResolver<'a> {
-    fn resolve(&self, type_id: TypeId) -> Option<String> {
-        self.registry
+impl<'a> DeclWorld<'a> {
+    pub fn new(registry: &'a Registry) -> Self {
+        // Deterministic output order (registry is backed by a HashMap).
+        let mut names = HashMap::new();
+        let mut name_set = HashSet::new();
+        for (type_id, expr) in registry.iter() {
+            if let Some(name) = expr.name() {
+                if !name_set.insert(name) {
+                    panic!("Duplicate type name: {}", name);
+                }
+                names.insert(*type_id, name.to_string());
+            }
+        }
+        Self { registry, names }
+    }
+
+    /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
+    pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
+        let mut out = String::new();
+        let expr = self
+            .registry
             .get(type_id)
-            .and_then(|expr| expr.name().map(|name| name.to_string()))
+            .expect("type not found in registry");
+        let name = self.resolve(type_id).expect("type name not found");
+        // Add a TypeScript comment with the Rust type name
+        out.push_str(&format!("// Rust type: {}\n", name));
+        let ts_expr = to_ts_type_expr(expr, self, flavor);
+        let ts_expr_str = format!("{:80.4}", ts_expr);
+        out.push_str("export type ");
+        out.push_str(&name);
+        out.push_str(" = ");
+        out.push_str(&ts_expr_str);
+        out.push_str(";\n");
+        out
+    }
+
+    fn resolve(&self, type_id: TypeId) -> Option<String> {
+        self.names.get(&type_id).cloned()
     }
 }
 
-fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr {
+#[derive(Clone, Copy)]
+pub enum Flavor {
+    Serialize,
+    Deserialize,
+}
+
+fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> TypeExpr {
     fn ts_str_lit(s: &str) -> TypeExpr {
         TypeExpr::Value(value::Value::String(s.to_owned()))
     }
@@ -38,7 +78,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
 
     match expr {
         ScTypeExpr::Remote { path: _, type_id } => {
-            let name = name_resolver.resolve(*type_id).unwrap();
+            let name = world.resolve(*type_id).unwrap();
             TypeExpr::Remote(name)
         }
 
@@ -64,7 +104,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
 
         ScTypeExpr::Option(inner) => TypeExpr::Union(
             [
-                to_ts_type_expr(inner.as_ref(), name_resolver),
+                to_ts_type_expr(inner.as_ref(), world, flavor),
                 TypeExpr::null(),
             ]
             .into(),
@@ -73,36 +113,37 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
         ScTypeExpr::Unit => TypeExpr::null(),
         ScTypeExpr::UnitStruct { .. } => TypeExpr::null(),
 
-        ScTypeExpr::NewtypeStruct { inner, .. } => to_ts_type_expr(inner.as_ref(), name_resolver),
+        ScTypeExpr::NewtypeStruct { inner, .. } => to_ts_type_expr(inner.as_ref(), world, flavor),
 
         ScTypeExpr::Seq { element } => TypeExpr::Array(ArrayType::new(to_ts_type_expr(
             element.as_ref(),
-            name_resolver,
+            world,
+            flavor,
         ))),
 
         ScTypeExpr::Tuple { elements } => TypeExpr::Tuple(TupleType::new(
             elements
                 .iter()
-                .map(|e| to_ts_type_expr(e, name_resolver))
+                .map(|e| to_ts_type_expr(e, world, flavor))
                 .collect(),
         )),
 
         ScTypeExpr::TupleStruct { elements, .. } => TypeExpr::Tuple(TupleType::new(
             elements
                 .iter()
-                .map(|e| to_ts_type_expr(e, name_resolver))
+                .map(|e| to_ts_type_expr(e, world, flavor))
                 .collect(),
         )),
 
         ScTypeExpr::Map { key, value: val } => TypeExpr::Record(RecordType::new(
-            to_ts_type_expr(key.as_ref(), name_resolver),
-            to_ts_type_expr(val.as_ref(), name_resolver),
+            to_ts_type_expr(key.as_ref(), world, flavor),
+            to_ts_type_expr(val.as_ref(), world, flavor),
         )),
 
         ScTypeExpr::Struct { fields, .. } => to_struct_type_expr(fields.iter().map(|f| {
             (
                 f.name.as_ref().to_string(),
-                to_ts_type_expr(&f.ty, name_resolver),
+                to_ts_type_expr(&f.ty, world, flavor),
             )
         })),
 
@@ -123,14 +164,14 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                     (None, None, serde_sc::expr::VariantKind::Newtype(inner)) => {
                         to_struct_type_expr([(
                             vname.to_string(),
-                            to_ts_type_expr(inner.as_ref(), name_resolver),
+                            to_ts_type_expr(inner.as_ref(), world, flavor),
                         )])
                     }
                     (None, None, serde_sc::expr::VariantKind::Tuple(elements)) => {
                         let tup = TypeExpr::Tuple(TupleType::new(
                             elements
                                 .iter()
-                                .map(|e| to_ts_type_expr(e, name_resolver))
+                                .map(|e| to_ts_type_expr(e, world, flavor))
                                 .collect(),
                         ));
                         to_struct_type_expr([(vname.to_string(), tup)])
@@ -139,7 +180,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         let inner = to_struct_type_expr(fields.iter().map(|f| {
                             (
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, name_resolver),
+                                to_ts_type_expr(&f.ty, world, flavor),
                             )
                         }));
                         to_struct_type_expr([(vname.to_string(), inner)])
@@ -155,7 +196,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         for f in fields {
                             record.insert(
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, name_resolver).into(),
+                                to_ts_type_expr(&f.ty, world, flavor).into(),
                             );
                         }
                         TypeExpr::Struct(StructType::new(record))
@@ -174,7 +215,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         (tag_key.to_string(), ts_str_lit(vname)),
                         (
                             content_key.to_string(),
-                            to_ts_type_expr(inner.as_ref(), name_resolver),
+                            to_ts_type_expr(inner.as_ref(), world, flavor),
                         ),
                     ]),
                     (
@@ -185,7 +226,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         let tup = TypeExpr::Tuple(TupleType::new(
                             elements
                                 .iter()
-                                .map(|e| to_ts_type_expr(e, name_resolver))
+                                .map(|e| to_ts_type_expr(e, world, flavor))
                                 .collect(),
                         ));
                         to_struct_type_expr([
@@ -201,7 +242,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         let inner = to_struct_type_expr(fields.iter().map(|f| {
                             (
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, name_resolver),
+                                to_ts_type_expr(&f.ty, world, flavor),
                             )
                         }));
                         to_struct_type_expr([
@@ -220,30 +261,4 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
             TypeExpr::Union(items.into())
         }
     }
-}
-
-/// Export all types in the registry to TypeScript type declaration statement.
-pub fn to_typescript(registry: &Registry) -> String {
-    let name_resolver = NameResolver { registry };
-
-    // Deterministic output order (registry is backed by a HashMap).
-    let mut named: BTreeMap<String, &ScTypeExpr> = BTreeMap::new();
-    for (_type_id, expr) in registry.iter() {
-        if let Some(name) = expr.name() {
-            named.insert(name.to_string(), expr);
-        }
-    }
-
-    let mut out = String::new();
-    for (name, expr) in named {
-        let ts_expr = to_ts_type_expr(expr, &name_resolver);
-        let ts_expr_str = format!("{:80.4}", ts_expr);
-        out.push_str("export type ");
-        out.push_str(&name);
-        out.push_str(" = ");
-        out.push_str(&ts_expr_str);
-        out.push_str(";\n");
-    }
-
-    out
 }

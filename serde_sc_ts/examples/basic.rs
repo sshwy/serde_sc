@@ -1,5 +1,5 @@
 use serde_sc::{SerdeSchema, registry::Registry};
-use serde_sc_ts::to_typescript;
+use serde_sc_ts::{DeclWorld, Flavor};
 
 #[derive(SerdeSchema)]
 #[allow(dead_code)]
@@ -29,5 +29,9 @@ struct Info {
 fn main() {
     let mut r = Registry::new();
     r.register::<Person>();
-    println!("{}", to_typescript(&r));
+    let w = DeclWorld::new(&r);
+    println!(
+        "{}",
+        w.to_export_statement(std::any::TypeId::of::<Person>(), Flavor::Deserialize)
+    );
 }

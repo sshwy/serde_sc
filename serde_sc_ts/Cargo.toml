@@ -5,3 +5,7 @@ edition.workspace = true
 
 [dependencies]
 serde_sc = { path = "../serde_sc" }
+
+[dev-dependencies]
+serde = { version = "*", features = ["derive"]}
+serde_json = "*"
