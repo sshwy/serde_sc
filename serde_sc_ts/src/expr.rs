@@ -367,6 +367,7 @@ impl TypeExpr {
         Self::Value(value::Value::Null)
     }
 
+    /// Creates a `TypeExpr` representing a struct with the given fields.
     pub fn struct_type(fields: impl IntoIterator<Item = (String, Field)>) -> Self {
         Self::Struct(StructType::new(fields.into_iter().collect()))
     }
@@ -533,16 +534,13 @@ mod tests {
     #[test]
     fn test_typeexpr_struct_flat_and_multiline() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         let person = person();
@@ -559,27 +557,21 @@ mod tests {
     #[test]
     fn test_typeexpr_struct_nested() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         fn person_ext() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("person"), Field::new(person(), false)),
-                    (String::from("age"), Field::new(TypeExpr::Number, false)),
-                    (String::from("zoo"), Field::new(TypeExpr::Any, false)),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("person"), Field::new(person(), false)),
+                (String::from("age"), Field::new(TypeExpr::Number, false)),
+                (String::from("zoo"), Field::new(TypeExpr::Any, false)),
+            ])
         }
 
         let person_ext = person_ext();
@@ -599,27 +591,21 @@ mod tests {
     #[test]
     fn test_typeexpr_record() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         fn person_ext() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("person"), Field::new(person(), false)),
-                    (String::from("age"), Field::new(TypeExpr::Number, false)),
-                    (String::from("zoo"), Field::new(TypeExpr::Any, false)),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("person"), Field::new(person(), false)),
+                (String::from("age"), Field::new(TypeExpr::Number, false)),
+                (String::from("zoo"), Field::new(TypeExpr::Any, false)),
+            ])
         }
 
         let person_map = TypeExpr::Record(RecordType::new(TypeExpr::String, person_ext()));
@@ -639,27 +625,21 @@ mod tests {
     #[test]
     fn test_typeexpr_tuple() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         fn person_ext() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("person"), Field::new(person(), false)),
-                    (String::from("age"), Field::new(TypeExpr::Number, false)),
-                    (String::from("zoo"), Field::new(TypeExpr::Any, false)),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("person"), Field::new(person(), false)),
+                (String::from("age"), Field::new(TypeExpr::Number, false)),
+                (String::from("zoo"), Field::new(TypeExpr::Any, false)),
+            ])
         }
 
         fn person_map() -> TypeExpr {
@@ -701,27 +681,21 @@ mod tests {
     #[test]
     fn test_typeexpr_union() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         fn person_ext() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("person"), Field::new(person(), false)),
-                    (String::from("age"), Field::new(TypeExpr::Number, false)),
-                    (String::from("zoo"), Field::new(TypeExpr::Any, false)),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("person"), Field::new(person(), false)),
+                (String::from("age"), Field::new(TypeExpr::Number, false)),
+                (String::from("zoo"), Field::new(TypeExpr::Any, false)),
+            ])
         }
 
         fn person_map() -> TypeExpr {
@@ -765,27 +739,21 @@ mod tests {
     #[test]
     fn test_typeexpr_intersection() {
         fn person() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("name"), Field::new(TypeExpr::String, false)),
-                    (
-                        String::from("permissions"),
-                        Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
-                    ),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("name"), Field::new(TypeExpr::String, false)),
+                (
+                    String::from("permissions"),
+                    Field::new(TypeExpr::Array(ArrayType::new(TypeExpr::Number)), false),
+                ),
+            ])
         }
 
         fn person_ext() -> TypeExpr {
-            TypeExpr::Struct(StructType::new(
-                [
-                    (String::from("person"), Field::new(person(), false)),
-                    (String::from("age"), Field::new(TypeExpr::Number, false)),
-                    (String::from("zoo"), Field::new(TypeExpr::Any, false)),
-                ]
-                .into(),
-            ))
+            TypeExpr::struct_type([
+                (String::from("person"), Field::new(person(), false)),
+                (String::from("age"), Field::new(TypeExpr::Number, false)),
+                (String::from("zoo"), Field::new(TypeExpr::Any, false)),
+            ])
         }
 
         fn person_map() -> TypeExpr {
