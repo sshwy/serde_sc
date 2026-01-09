@@ -48,12 +48,37 @@ impl ArrayType {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct Field {
+    pub ty: TypeExpr,
+    pub optional: bool,
+}
+
+impl Field {
+    pub fn new(ty: TypeExpr) -> Self {
+        Self {
+            ty,
+            optional: false,
+        }
+    }
+
+    pub fn optional(ty: TypeExpr) -> Self {
+        Self { ty, optional: true }
+    }
+}
+
+impl From<TypeExpr> for Field {
+    fn from(value: TypeExpr) -> Self {
+        Self::new(value)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct StructType {
-    pub record: BTreeMap<String, TypeExpr>,
+    pub record: BTreeMap<String, Field>,
 }
 
 impl StructType {
-    pub fn new(record: BTreeMap<String, TypeExpr>) -> Self {
+    pub fn new(record: BTreeMap<String, Field>) -> Self {
         Self { record }
     }
 
@@ -67,14 +92,14 @@ impl StructType {
         let bs = self
             .record
             .iter()
-            .map(|(k, v)| (k, v.to_string_with(indent, lw2)))
+            .map(|(k, v)| (k, (v.optional, v.ty.to_string_with(indent, lw2))))
             .collect();
         write!(f, "{}", StructTemplate { record: bs, indent })
     }
 }
 
 struct StructTemplate<'a> {
-    record: BTreeMap<&'a String, String>,
+    record: BTreeMap<&'a String, (bool, String)>,
     indent: usize,
 }
 
@@ -85,29 +110,48 @@ impl std::fmt::Display for StructTemplate<'_> {
         let indented = |s: &str| -> String { s.replace("\n", &indent_ln) };
         if self.indent > 0 {
             f.write_str("{\n")?;
-            for (k, v) in self.record.iter() {
-                writeln!(f, "{indent_str}{k}: {v};", v = indented(v.as_str()))?;
+            for (k, (optional, v)) in self.record.iter() {
+                let opt = if *optional { "?" } else { "" };
+                writeln!(f, "{indent_str}{k}{opt}: {v};", v = indented(v.as_str()))?;
             }
             f.write_str("}")
         } else {
             f.write_str("{ ")?;
-            for (k, v) in self.record.iter() {
-                write!(f, "{k}: {v}; ")?;
+            for (k, (optional, v)) in self.record.iter() {
+                let opt = if *optional { "?" } else { "" };
+                write!(f, "{k}{opt}: {v}; ")?;
             }
             f.write_str("}")
         }
     }
 }
 
+impl From<BTreeMap<String, Field>> for StructType {
+    fn from(record: BTreeMap<String, Field>) -> Self {
+        Self::new(record)
+    }
+}
+
 impl From<BTreeMap<String, TypeExpr>> for StructType {
     fn from(record: BTreeMap<String, TypeExpr>) -> Self {
-        Self::new(record)
+        Self::new(
+            record
+                .into_iter()
+                .map(|(k, v)| (k, Field::new(v)))
+                .collect(),
+        )
+    }
+}
+
+impl<const N: usize> From<[(String, Field); N]> for StructType {
+    fn from(record: [(String, Field); N]) -> Self {
+        Self::new(record.into_iter().collect())
     }
 }
 
 impl<const N: usize> From<[(String, TypeExpr); N]> for StructType {
     fn from(record: [(String, TypeExpr); N]) -> Self {
-        Self::new(record.into_iter().collect())
+        Self::from(record.into_iter().collect::<BTreeMap<_, _>>())
     }
 }
 
@@ -487,7 +531,7 @@ impl TypeExpr {
         let Self::Struct(s) = self else {
             panic!("invalid struct to insert")
         };
-        s.record.insert(k, v_type);
+        s.record.insert(k, Field::new(v_type));
     }
 
     pub fn struct_merge(&mut self, v_type: TypeExpr) {
@@ -514,10 +558,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -540,10 +584,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -553,9 +597,9 @@ mod tests {
         fn person_ext() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("person"), person()),
-                    (String::from("age"), TypeExpr::Number),
-                    (String::from("zoo"), TypeExpr::Any),
+                    (String::from("person"), Field::new(person())),
+                    (String::from("age"), TypeExpr::Number.into()),
+                    (String::from("zoo"), TypeExpr::Any.into()),
                 ]
                 .into(),
             ))
@@ -580,10 +624,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -593,9 +637,9 @@ mod tests {
         fn person_ext() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("person"), person()),
-                    (String::from("age"), TypeExpr::Number),
-                    (String::from("zoo"), TypeExpr::Any),
+                    (String::from("person"), Field::new(person())),
+                    (String::from("age"), TypeExpr::Number.into()),
+                    (String::from("zoo"), TypeExpr::Any.into()),
                 ]
                 .into(),
             ))
@@ -620,10 +664,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -633,9 +677,9 @@ mod tests {
         fn person_ext() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("person"), person()),
-                    (String::from("age"), TypeExpr::Number),
-                    (String::from("zoo"), TypeExpr::Any),
+                    (String::from("person"), Field::new(person())),
+                    (String::from("age"), TypeExpr::Number.into()),
+                    (String::from("zoo"), TypeExpr::Any.into()),
                 ]
                 .into(),
             ))
@@ -682,10 +726,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -695,9 +739,9 @@ mod tests {
         fn person_ext() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("person"), person()),
-                    (String::from("age"), TypeExpr::Number),
-                    (String::from("zoo"), TypeExpr::Any),
+                    (String::from("person"), Field::new(person())),
+                    (String::from("age"), TypeExpr::Number.into()),
+                    (String::from("zoo"), TypeExpr::Any.into()),
                 ]
                 .into(),
             ))
@@ -746,10 +790,10 @@ mod tests {
         fn person() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("name"), TypeExpr::String),
+                    (String::from("name"), TypeExpr::String.into()),
                     (
                         String::from("permissions"),
-                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)),
+                        TypeExpr::Array(ArrayType::new(TypeExpr::Number)).into(),
                     ),
                 ]
                 .into(),
@@ -759,9 +803,9 @@ mod tests {
         fn person_ext() -> TypeExpr {
             TypeExpr::Struct(StructType::new(
                 [
-                    (String::from("person"), person()),
-                    (String::from("age"), TypeExpr::Number),
-                    (String::from("zoo"), TypeExpr::Any),
+                    (String::from("person"), Field::new(person())),
+                    (String::from("age"), TypeExpr::Number.into()),
+                    (String::from("zoo"), TypeExpr::Any.into()),
                 ]
                 .into(),
             ))

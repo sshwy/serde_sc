@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    expr::{ArrayType, RecordType, StructType, TupleType, TypeExpr},
+    expr::{ArrayType, Field, RecordType, StructType, TupleType, TypeExpr},
     value,
 };
 use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
@@ -29,9 +29,11 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
     }
 
     fn to_struct_type_expr(items: impl IntoIterator<Item = (String, TypeExpr)>) -> TypeExpr {
-        TypeExpr::Struct(StructType::new(
-            items.into_iter().collect::<BTreeMap<_, _>>(),
-        ))
+        let record = items
+            .into_iter()
+            .map(|(k, v)| (k, Field::new(v)))
+            .collect::<BTreeMap<String, Field>>();
+        TypeExpr::Struct(StructType::new(record))
     }
 
     match expr {
@@ -148,12 +150,12 @@ fn to_ts_type_expr(expr: &ScTypeExpr, name_resolver: &NameResolver) -> TypeExpr 
                         to_struct_type_expr([(tag_key.to_string(), ts_str_lit(vname))])
                     }
                     (Some(tag_key), None, serde_sc::expr::VariantKind::Struct(fields)) => {
-                        let mut record: BTreeMap<String, TypeExpr> = BTreeMap::new();
-                        record.insert(tag_key.to_string(), ts_str_lit(vname));
+                        let mut record: BTreeMap<String, Field> = BTreeMap::new();
+                        record.insert(tag_key.to_string(), ts_str_lit(vname).into());
                         for f in fields {
                             record.insert(
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, name_resolver),
+                                to_ts_type_expr(&f.ty, name_resolver).into(),
                             );
                         }
                         TypeExpr::Struct(StructType::new(record))
