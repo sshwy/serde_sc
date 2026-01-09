@@ -1,15 +1,7 @@
 [workspace]
 resolver = "3"
-members = [".", "macros"]
+members = ["serde_sc", "serde_sc_macros"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-
-[package]
-name = "serde_sc"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-serde_sc_macros = { path = "macros" }

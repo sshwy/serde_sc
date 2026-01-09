@@ -1,0 +1,7 @@
+[package]
+name = "serde_sc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde_sc_macros = { path = "../serde_sc_macros" }
