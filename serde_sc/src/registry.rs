@@ -47,6 +47,11 @@ impl Registry {
     pub fn get(&self, type_id: TypeId) -> Option<&TypeExpr> {
         self.state.get(&type_id)
     }
+
+    /// Returns an iterator over all registered `(TypeId, TypeExpr)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&TypeId, &TypeExpr)> {
+        self.state.iter()
+    }
 }
 
 /// `RegistryContext` provides contextual access to a `Registry`

@@ -162,6 +162,19 @@ impl TypeExpr {
             value: Box::new(value.into()),
         }
     }
+
+    /// Returns the name of the type if this is a named type
+    /// (`UnitStruct`, `NewtypeStruct`, `TupleStruct`, or `Struct`), otherwise returns `None`.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::UnitStruct { name } => Some(name.as_ref()),
+            Self::NewtypeStruct { name, .. } => Some(name.as_ref()),
+            Self::TupleStruct { name, .. } => Some(name.as_ref()),
+            Self::Struct { name, .. } => Some(name.as_ref()),
+            Self::Enum { name, .. } => Some(name.as_ref()),
+            _ => None,
+        }
+    }
 }
 
 impl From<PrimitiveType> for TypeExpr {
