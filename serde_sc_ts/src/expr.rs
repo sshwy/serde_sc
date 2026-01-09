@@ -341,6 +341,12 @@ pub enum TypeExpr {
     Any,
 }
 
+impl TypeExpr {
+    pub const fn null() -> Self {
+        Self::Value(value::Value::Null)
+    }
+}
+
 impl std::fmt::Display for TypeExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let indent = f.precision().unwrap_or(0);
