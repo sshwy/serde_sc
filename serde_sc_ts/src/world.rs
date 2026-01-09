@@ -1,4 +1,5 @@
-// use serde_sc::registry::Registry;
+#[cfg(test)]
+mod tests;
 
 use std::{
     any::TypeId,
@@ -32,18 +33,23 @@ impl<'a> DeclWorld<'a> {
         Self { registry, names }
     }
 
-    /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
-    pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
-        let mut out = String::new();
+    /// Converts the given Rust type (by TypeId) into a TypeScript TypeExpr using the configured flavor.
+    pub fn to_type_expr(&self, type_id: TypeId, flavor: Flavor) -> TypeExpr {
         let expr = self
             .registry
             .get(type_id)
             .expect("type not found in registry");
+        to_ts_type_expr(expr, self, flavor)
+    }
+
+    /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
+    pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
+        let ts_expr = self.to_type_expr(type_id, flavor);
         let name = self.resolve(type_id).expect("type name not found");
-        // Add a TypeScript comment with the Rust type name
-        out.push_str(&format!("// Rust type: {}\n", name));
-        let ts_expr = to_ts_type_expr(expr, self, flavor);
         let ts_expr_str = format!("{:80.4}", ts_expr);
+
+        let mut out = String::new();
+        out.push_str(&format!("// Rust type: {}\n", name));
         out.push_str("export type ");
         out.push_str(&name);
         out.push_str(" = ");
@@ -63,16 +69,30 @@ pub enum Flavor {
     Deserialize,
 }
 
+fn to_ts_type_field(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Field {
+    match flavor {
+        Flavor::Serialize => Field::new(to_ts_type_expr(expr, world, flavor), false),
+        Flavor::Deserialize => match expr {
+            ScTypeExpr::Option(type_expr) => {
+                let mut type_expr: &ScTypeExpr = type_expr.as_ref();
+                // unwrap nested options
+                while let ScTypeExpr::Option(inner) = type_expr {
+                    type_expr = inner;
+                }
+                Field::new(to_ts_type_expr(type_expr, world, flavor), true)
+            }
+            _ => Field::new(to_ts_type_expr(expr, world, flavor), false),
+        },
+    }
+}
+
 fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> TypeExpr {
     fn ts_str_lit(s: &str) -> TypeExpr {
         TypeExpr::Value(value::Value::String(s.to_owned()))
     }
 
-    fn to_struct_type_expr(items: impl IntoIterator<Item = (String, TypeExpr)>) -> TypeExpr {
-        let record = items
-            .into_iter()
-            .map(|(k, v)| (k, Field::new(v)))
-            .collect::<BTreeMap<String, Field>>();
+    fn to_struct_type_expr(items: impl IntoIterator<Item = (String, Field)>) -> TypeExpr {
+        let record = items.into_iter().collect::<BTreeMap<String, Field>>();
         TypeExpr::Struct(StructType::new(record))
     }
 
@@ -143,7 +163,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
         ScTypeExpr::Struct { fields, .. } => to_struct_type_expr(fields.iter().map(|f| {
             (
                 f.name.as_ref().to_string(),
-                to_ts_type_expr(&f.ty, world, flavor),
+                to_ts_type_field(&f.ty, world, flavor),
             )
         })),
 
@@ -164,7 +184,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                     (None, None, serde_sc::expr::VariantKind::Newtype(inner)) => {
                         to_struct_type_expr([(
                             vname.to_string(),
-                            to_ts_type_expr(inner.as_ref(), world, flavor),
+                            to_ts_type_field(inner.as_ref(), world, flavor),
                         )])
                     }
                     (None, None, serde_sc::expr::VariantKind::Tuple(elements)) => {
@@ -174,29 +194,32 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                                 .map(|e| to_ts_type_expr(e, world, flavor))
                                 .collect(),
                         ));
-                        to_struct_type_expr([(vname.to_string(), tup)])
+                        to_struct_type_expr([(vname.to_string(), Field::new(tup, false))])
                     }
                     (None, None, serde_sc::expr::VariantKind::Struct(fields)) => {
                         let inner = to_struct_type_expr(fields.iter().map(|f| {
                             (
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, world, flavor),
+                                to_ts_type_field(&f.ty, world, flavor),
                             )
                         }));
-                        to_struct_type_expr([(vname.to_string(), inner)])
+                        to_struct_type_expr([(vname.to_string(), Field::new(inner, false))])
                     }
 
                     // Internally tagged: `#[serde(tag = "...")]`
                     (Some(tag_key), None, serde_sc::expr::VariantKind::Unit) => {
-                        to_struct_type_expr([(tag_key.to_string(), ts_str_lit(vname))])
+                        to_struct_type_expr([(
+                            tag_key.to_string(),
+                            Field::new(ts_str_lit(vname), false),
+                        )])
                     }
                     (Some(tag_key), None, serde_sc::expr::VariantKind::Struct(fields)) => {
                         let mut record: BTreeMap<String, Field> = BTreeMap::new();
-                        record.insert(tag_key.to_string(), ts_str_lit(vname).into());
+                        record.insert(tag_key.to_string(), Field::new(ts_str_lit(vname), false));
                         for f in fields {
                             record.insert(
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, world, flavor).into(),
+                                to_ts_type_field(&f.ty, world, flavor),
                             );
                         }
                         TypeExpr::Struct(StructType::new(record))
@@ -205,17 +228,20 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                     // Adjacently tagged: `#[serde(tag = "...", content = "...")]`
                     (Some(tag_key), Some(_content_key), serde_sc::expr::VariantKind::Unit) => {
                         // Unit variant has no content field in serde's adjacently tagged representation.
-                        to_struct_type_expr([(tag_key.to_string(), ts_str_lit(vname))])
+                        to_struct_type_expr([(
+                            tag_key.to_string(),
+                            Field::new(ts_str_lit(vname), false),
+                        )])
                     }
                     (
                         Some(tag_key),
                         Some(content_key),
                         serde_sc::expr::VariantKind::Newtype(inner),
                     ) => to_struct_type_expr([
-                        (tag_key.to_string(), ts_str_lit(vname)),
+                        (tag_key.to_string(), Field::new(ts_str_lit(vname), false)),
                         (
                             content_key.to_string(),
-                            to_ts_type_expr(inner.as_ref(), world, flavor),
+                            to_ts_type_field(inner.as_ref(), world, flavor),
                         ),
                     ]),
                     (
@@ -230,8 +256,8 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                                 .collect(),
                         ));
                         to_struct_type_expr([
-                            (tag_key.to_string(), ts_str_lit(vname)),
-                            (content_key.to_string(), tup),
+                            (tag_key.to_string(), Field::new(ts_str_lit(vname), false)),
+                            (content_key.to_string(), Field::new(tup, false)),
                         ])
                     }
                     (
@@ -242,12 +268,12 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                         let inner = to_struct_type_expr(fields.iter().map(|f| {
                             (
                                 f.name.as_ref().to_string(),
-                                to_ts_type_expr(&f.ty, world, flavor),
+                                to_ts_type_field(&f.ty, world, flavor),
                             )
                         }));
                         to_struct_type_expr([
-                            (tag_key.to_string(), ts_str_lit(vname)),
-                            (content_key.to_string(), inner),
+                            (tag_key.to_string(), Field::new(ts_str_lit(vname), false)),
+                            (content_key.to_string(), Field::new(inner, false)),
                         ])
                     }
 
