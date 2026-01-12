@@ -111,6 +111,28 @@ fn test_string_in_struct() {
 }
 
 #[test]
+fn test_serde_default_path_is_accepted_on_field() {
+    let input = r#"
+        struct S {
+            #[serde(default = "some::path::to::default_a")]
+            a: u32,
+        }
+        "#;
+    let expected = quote! {{
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new(
+            "a",
+            ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)
+        ));
+        ::serde_sc::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("S"),
+            fields: __fields,
+        }
+    }};
+    check_struct_to_typeexpr(input, expected);
+}
+
+#[test]
 fn test_seq_in_struct() {
     let input = r#"
         struct S {

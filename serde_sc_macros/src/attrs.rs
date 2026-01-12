@@ -221,6 +221,15 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
                 out.skip_serializing = true;
                 return Ok(());
             }
+            if meta.path.is_ident("default") {
+                // Accept both `#[serde(default)]` and `#[serde(default = "path")]`.
+                // This derive only builds schema, so we only need to *consume* the meta tokens.
+                if meta.input.peek(syn::token::Eq) {
+                    let v: LitStr = meta.value()?.parse()?;
+                    let _ = v;
+                }
+                return Ok(());
+            }
             if meta.path.is_ident("flatten") {
                 out.flatten = true;
                 return Ok(());
