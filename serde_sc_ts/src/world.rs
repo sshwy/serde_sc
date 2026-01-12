@@ -3,7 +3,7 @@ mod tests;
 
 use std::{
     any::TypeId,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
 };
 
 use crate::{
@@ -14,23 +14,28 @@ use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
 
 pub struct DeclWorld<'a> {
     registry: &'a Registry,
-    names: HashMap<TypeId, String>,
+    id_to_name: HashMap<TypeId, String>,
+    name_to_id: BTreeMap<String, TypeId>,
 }
 
 impl<'a> DeclWorld<'a> {
     pub fn new(registry: &'a Registry) -> Self {
         // Deterministic output order (registry is backed by a HashMap).
-        let mut names = HashMap::new();
-        let mut name_set = HashSet::new();
+        let mut id_to_name = HashMap::new();
+        let mut name_to_id = BTreeMap::new();
         for (type_id, expr) in registry.iter() {
             if let Some(name) = expr.name() {
-                if !name_set.insert(name) {
+                if name_to_id.insert(name.to_string(), *type_id).is_some() {
                     panic!("Duplicate type name: {}", name);
                 }
-                names.insert(*type_id, name.to_string());
+                id_to_name.insert(*type_id, name.to_string());
             }
         }
-        Self { registry, names }
+        Self {
+            registry,
+            id_to_name,
+            name_to_id,
+        }
     }
 
     /// Converts the given Rust type (by TypeId) into a TypeScript TypeExpr using the configured flavor.
@@ -58,9 +63,18 @@ impl<'a> DeclWorld<'a> {
         out
     }
 
+    /// Generates TypeScript export statements for all registered types.
+    pub fn to_export_statements(&self, flavor: Flavor) -> String {
+        let mut out = String::new();
+        for (_, type_id) in &self.name_to_id {
+            out.push_str(&self.to_export_statement(*type_id, flavor));
+        }
+        out
+    }
+
     /// Returns the Rust type name for the given TypeId, if it exists.
     pub fn resolve(&self, type_id: TypeId) -> Option<String> {
-        self.names.get(&type_id).cloned()
+        self.id_to_name.get(&type_id).cloned()
     }
 }
 

@@ -6,7 +6,7 @@ use std::{
 
 /// The `Registry` struct holds a mapping from `TypeId` to `TypeExpr`, allowing fast lookup
 /// of type information registered by the schema system.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Registry {
     state: HashMap<TypeId, TypeExpr>,
 }
