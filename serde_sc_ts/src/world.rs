@@ -25,9 +25,12 @@ impl<'a> DeclWorld<'a> {
         let mut name_to_id = BTreeMap::new();
         for (type_id, item) in registry.iter() {
             if let Some(name) = item.expr.name() {
-                if let Some(old) = name_to_id.insert(name.to_string(), (*type_id, item.name)) {
-                    panic!("Duplicate type name: {} ({} vs {})", name, old.1, item.name);
-                }
+                let name: &str = if name_to_id.contains_key(name) {
+                    &(String::from(name) + "_")
+                } else {
+                    name
+                };
+                name_to_id.insert(name.to_string(), (*type_id, item.name));
                 id_to_name.insert(*type_id, name.to_string());
             }
         }
