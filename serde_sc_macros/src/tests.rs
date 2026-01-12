@@ -319,7 +319,7 @@ fn test_struct_remote_fallback() {
             "inner",
             ::serde_sc::expr::TypeExpr::Remote {
                 path: ::std::borrow::Cow::Borrowed(stringify!(Inner)),
-                type_id: ::std::any::TypeId::of::<Inner>()
+                type_id: <Inner as ::serde_sc::SerdeSchema>::type_id(),
             }
         ));
         __fields.push(::serde_sc::expr::Field::new(

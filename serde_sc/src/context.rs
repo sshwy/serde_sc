@@ -1,5 +1,7 @@
 use std::{any::TypeId, collections::HashSet};
 
+use crate::SerdeSchema;
+
 /// Context used during schema building, such as for tracking which types are being processed to prevent infinite recursion.
 #[derive(Debug, Default)]
 pub struct Context {
@@ -10,17 +12,17 @@ impl Context {
     /// Returns `true` if the type `T` is currently pending in this context.
     pub fn is_pending<T>(&self) -> bool
     where
-        T: 'static,
+        T: SerdeSchema,
     {
-        self.pending.contains(&TypeId::of::<T>())
+        self.pending.contains(&T::type_id())
     }
 
     /// Marks the type `T` as pending or not, according to the `pending` argument.
     pub fn set_pending<T>(&mut self, pending: bool)
     where
-        T: 'static,
+        T: SerdeSchema,
     {
-        let id = TypeId::of::<T>();
+        let id = T::type_id();
         if pending {
             self.pending.insert(id);
         } else {
