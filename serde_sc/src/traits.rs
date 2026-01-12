@@ -145,7 +145,7 @@ where
     T: SerdeSchema,
 {
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
-        T::build_type_expr_no_recursion(ctxt)
+        T::build_type_expr(ctxt)
     }
 
     fn on_register(registry: &mut RegistryContext) {
@@ -171,7 +171,7 @@ where
     T: SerdeSchema,
 {
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
-        T::build_type_expr_no_recursion(ctxt)
+        T::build_type_expr(ctxt)
     }
 
     fn on_register(registry: &mut RegistryContext) {
@@ -197,7 +197,7 @@ where
     T: SerdeSchema,
 {
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
-        T::build_type_expr_no_recursion(ctxt)
+        T::build_type_expr(ctxt)
     }
 
     fn on_register(registry: &mut RegistryContext) {

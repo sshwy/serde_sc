@@ -11,17 +11,24 @@ use crate::{
 
 #[derive(SerdeSchema, Deserialize, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
-struct TestDe {
+struct OptFields {
     opt_field: Option<i32>,
     opt_opt_field: Option<Option<i32>>,
     opt_opt_opt_field: Option<Option<Option<i32>>>,
+}
+
+#[derive(SerdeSchema, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+struct ArcFields {
+    #[serde(flatten)]
+    arc: Arc<OptFields>,
 }
 
 // Assertions tell us that nested options are handled just like a single option during JSON deserialization.
 #[test]
 fn test_de_option() {
     assert_eq!(
-        TestDe {
+        OptFields {
             opt_field: None,
             opt_opt_field: None,
             opt_opt_opt_field: None,
@@ -30,7 +37,7 @@ fn test_de_option() {
     );
 
     assert_eq!(
-        TestDe {
+        OptFields {
             opt_field: None,
             opt_opt_field: None,
             opt_opt_opt_field: None,
@@ -44,7 +51,7 @@ fn test_de_option() {
     );
 
     assert_eq!(
-        TestDe {
+        OptFields {
             opt_field: Some(1),
             opt_opt_field: Some(Some(1)),
             opt_opt_opt_field: Some(Some(Some(1))),
@@ -58,9 +65,9 @@ fn test_de_option() {
     );
 
     let mut registry = Registry::new();
-    registry.register::<TestDe>();
+    registry.register::<OptFields>();
     let world = DeclWorld::new(&registry);
-    let type_id = TypeId::of::<TestDe>();
+    let type_id = TypeId::of::<OptFields>();
     let ts = world.to_type_expr(type_id, Flavor::Deserialize);
     assert_eq!(
         ts,
@@ -88,10 +95,19 @@ fn test_de_option() {
 #[test]
 fn test_transparent_types() {
     let mut registry = Registry::new();
-    registry.register::<TestDe>();
-    registry.register::<Arc<TestDe>>();
-    registry.register::<Rc<TestDe>>();
-    registry.register::<Box<TestDe>>();
+    registry.register::<OptFields>();
+    registry.register::<Arc<OptFields>>();
+    registry.register::<ArcFields>();
+    registry.register::<Rc<OptFields>>();
+    registry.register::<Box<OptFields>>();
+    let world = DeclWorld::new(&registry);
+    dbg!(world.to_export_statements(Flavor::Serialize));
+}
+
+#[test]
+fn test_arc_flatten() {
+    let mut registry = Registry::new();
+    registry.register::<ArcFields>();
     let world = DeclWorld::new(&registry);
     dbg!(world.to_export_statements(Flavor::Serialize));
 }
