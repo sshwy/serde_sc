@@ -596,3 +596,71 @@ fn test_custom_serde_sc_crate_path() {
     }};
     check_struct_to_typeexpr(input, expected);
 }
+
+#[test]
+fn test_container_serde_attr() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        #[serde(bound = "T: ::serde::Serialize")]
+        struct S<T> {
+            a: T,
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    // Should accept container-level `#[serde(...)]` attributes (even those serde_sc doesn't use).
+    let _ts = expand_serde_schema(&input).expect("expand_serde_schema");
+}
+
+#[test]
+fn test_variant_serde_attr() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        enum E {
+            #[serde(alias = "A1")]
+            A,
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    // Should accept variant-level `#[serde(...)]` attributes (even those serde_sc doesn't use).
+    let _ts = expand_serde_schema(&input).expect("expand_serde_schema");
+}
+
+#[test]
+fn test_field_serde_attr() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        struct S {
+            #[serde(with = "some::path")]
+            a: u8,
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    // Should accept field-level `#[serde(...)]` attributes (even those serde_sc doesn't use).
+    let _ts = expand_serde_schema(&input).expect("expand_serde_schema");
+}
+
+#[test]
+fn test_serde_as_attr() {
+    let input: DeriveInput = syn::parse_str(
+        r#"
+        #[serde_as]
+        #[derive(Debug, Deserialize, SerdeSchema, Clone)]
+        pub struct CursorQuery {
+            #[serde_as(as = "DisplayFromStr")]
+            max_count: u8,
+            #[serde_as(as = "DisplayFromStr")]
+            start_id: u32,
+        }
+        "#,
+    )
+    .expect("parse input");
+
+    // Should accept container-level `#[serde(...)]` attributes (even those serde_sc doesn't use).
+    let _ts = expand_serde_schema(&input).expect("expand_serde_schema");
+}

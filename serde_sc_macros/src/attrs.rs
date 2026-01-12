@@ -128,6 +128,11 @@ pub(crate) fn parse_container_serde_attrs(
                 })?);
                 return Ok(());
             }
+            // Be permissive: serde has many container attrs that don't affect schema generation.
+            // Still, we *must* consume any trailing tokens (`= "..."`, `( ... )`, etc.) so parsing
+            // doesn't fail on otherwise-valid serde attributes.
+            let _rest: proc_macro2::TokenStream = meta.input.parse()?;
+            let _ = _rest;
             Ok(())
         })?;
     }
@@ -183,6 +188,10 @@ pub(crate) fn parse_variant_serde_attrs(
                 })?);
                 return Ok(());
             }
+            // Be permissive: serde has many variant attrs that don't affect schema generation.
+            // Still, we must consume any trailing tokens.
+            let _rest: proc_macro2::TokenStream = meta.input.parse()?;
+            let _ = _rest;
             Ok(())
         })?;
     }
@@ -239,6 +248,10 @@ pub(crate) fn parse_field_serde_attrs(attrs: &[syn::Attribute]) -> syn::Result<F
                 out.rename = Some(v.value());
                 return Ok(());
             }
+            // Be permissive: serde has many field attrs that don't affect schema generation.
+            // Still, we must consume any trailing tokens.
+            let _rest: proc_macro2::TokenStream = meta.input.parse()?;
+            let _ = _rest;
             Ok(())
         })?;
     }
