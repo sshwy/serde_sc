@@ -77,7 +77,39 @@ impl<'a> DeclWorld<'a> {
 
     /// Returns the Rust type name for the given TypeId, if it exists.
     pub fn resolve(&self, type_id: TypeId) -> Option<String> {
-        self.id_to_name.get(&type_id).cloned()
+        if let Some(s) = self.id_to_name.get(&type_id).cloned() {
+            return Some(s);
+        }
+
+        if let Some(s) = self.resolve_primitives(type_id) {
+            return Some(s);
+        }
+
+        None
+    }
+
+    fn resolve_primitives(&self, type_id: TypeId) -> Option<String> {
+        if type_id == TypeId::of::<i8>()
+            || type_id == TypeId::of::<i16>()
+            || type_id == TypeId::of::<i32>()
+            || type_id == TypeId::of::<i64>()
+            || type_id == TypeId::of::<i128>()
+            || type_id == TypeId::of::<u8>()
+            || type_id == TypeId::of::<u16>()
+            || type_id == TypeId::of::<u32>()
+            || type_id == TypeId::of::<u64>()
+            || type_id == TypeId::of::<u128>()
+            || type_id == TypeId::of::<f32>()
+            || type_id == TypeId::of::<f64>()
+        {
+            Some("number".to_string())
+        } else if type_id == TypeId::of::<bool>() {
+            Some("boolean".to_string())
+        } else if type_id == TypeId::of::<String>() {
+            Some("string".to_string())
+        } else {
+            None
+        }
     }
 }
 

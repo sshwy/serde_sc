@@ -111,3 +111,22 @@ fn test_arc_flatten() {
     let world = DeclWorld::new(&registry);
     dbg!(world.to_export_statements(Flavor::Serialize));
 }
+
+type Id = i32;
+
+#[derive(SerdeSchema, Debug)]
+#[allow(dead_code)]
+struct MyStruct {
+    id: Id,
+}
+
+#[test]
+fn test_primitive_fields() {
+    let mut registry = Registry::new();
+    registry.register::<MyStruct>();
+    let world = DeclWorld::new(&registry);
+    assert_eq!(
+        world.to_export_statements(Flavor::Serialize),
+        "// Rust type: MyStruct\nexport type MyStruct = {\n    id: number;\n};\n"
+    );
+}
