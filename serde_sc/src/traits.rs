@@ -42,7 +42,7 @@ pub trait SerdeSchema: 'static {
             return;
         }
         registry.set_pending::<Self>(true);
-        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
 
@@ -141,7 +141,7 @@ where
         }
         registry.set_pending::<Self>(true);
         T::on_register(registry);
-        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
 }
@@ -160,7 +160,7 @@ where
         }
         registry.set_pending::<Self>(true);
         T::on_register(registry);
-        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
 }
@@ -179,7 +179,7 @@ where
         }
         registry.set_pending::<Self>(true);
         T::on_register(registry);
-        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
 }

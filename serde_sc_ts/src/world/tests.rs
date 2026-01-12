@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use std::{any::TypeId, sync::Arc};
 
 use serde::Deserialize;
 use serde_json::json;
@@ -83,4 +83,13 @@ fn test_de_option() {
         "{}",
         world.to_export_statement(type_id, Flavor::Deserialize)
     )
+}
+
+#[test]
+fn test_arc_type() {
+    let mut registry = Registry::new();
+    registry.register::<TestDe>();
+    registry.register::<Arc<TestDe>>();
+    let world = DeclWorld::new(&registry);
+    world.to_export_statements(Flavor::Serialize);
 }

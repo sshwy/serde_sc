@@ -15,7 +15,7 @@ use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
 pub struct DeclWorld<'a> {
     registry: &'a Registry,
     id_to_name: HashMap<TypeId, String>,
-    name_to_id: BTreeMap<String, TypeId>,
+    name_to_id: BTreeMap<String, (TypeId, &'static str)>,
 }
 
 impl<'a> DeclWorld<'a> {
@@ -23,10 +23,10 @@ impl<'a> DeclWorld<'a> {
         // Deterministic output order (registry is backed by a HashMap).
         let mut id_to_name = HashMap::new();
         let mut name_to_id = BTreeMap::new();
-        for (type_id, expr) in registry.iter() {
-            if let Some(name) = expr.name() {
-                if name_to_id.insert(name.to_string(), *type_id).is_some() {
-                    panic!("Duplicate type name: {}", name);
+        for (type_id, item) in registry.iter() {
+            if let Some(name) = item.expr.name() {
+                if let Some(old) = name_to_id.insert(name.to_string(), (*type_id, item.name)) {
+                    panic!("Duplicate type name: {} ({} vs {})", name, old.1, item.name);
                 }
                 id_to_name.insert(*type_id, name.to_string());
             }
@@ -40,11 +40,11 @@ impl<'a> DeclWorld<'a> {
 
     /// Converts the given Rust type (by TypeId) into a TypeScript TypeExpr using the configured flavor.
     pub fn to_type_expr(&self, type_id: TypeId, flavor: Flavor) -> TypeExpr {
-        let expr = self
+        let item = self
             .registry
             .get(type_id)
             .expect("type not found in registry");
-        to_ts_type_expr(expr, self, flavor)
+        to_ts_type_expr(&item.expr, self, flavor)
     }
 
     /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
@@ -66,8 +66,8 @@ impl<'a> DeclWorld<'a> {
     /// Generates TypeScript export statements for all registered types.
     pub fn to_export_statements(&self, flavor: Flavor) -> String {
         let mut out = String::new();
-        for (_, type_id) in &self.name_to_id {
-            out.push_str(&self.to_export_statement(*type_id, flavor));
+        for (_, item) in &self.name_to_id {
+            out.push_str(&self.to_export_statement(item.0, flavor));
         }
         out
     }

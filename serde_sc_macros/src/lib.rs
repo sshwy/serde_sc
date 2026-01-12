@@ -88,7 +88,7 @@ fn build_on_register_body(
         }
         registry.set_pending::<Self>(true);
         #(#dep_calls)*
-        registry.try_insert_with(::std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     })
 }
