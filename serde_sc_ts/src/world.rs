@@ -58,7 +58,8 @@ impl<'a> DeclWorld<'a> {
         out
     }
 
-    fn resolve(&self, type_id: TypeId) -> Option<String> {
+    /// Returns the Rust type name for the given TypeId, if it exists.
+    pub fn resolve(&self, type_id: TypeId) -> Option<String> {
         self.names.get(&type_id).cloned()
     }
 }
