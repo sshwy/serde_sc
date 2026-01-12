@@ -443,7 +443,7 @@ fn test_enum_tag_attr_rejects_tuple_variant() {
         r#"
         #[serde(tag = "type")]
         enum E {
-            A(u8),
+            A(u8, i32),
         }
         "#,
     )
@@ -452,6 +452,34 @@ fn test_enum_tag_attr_rejects_tuple_variant() {
     let err = expand_serde_schema(&input).expect_err("expected error");
     let msg = err.to_string();
     assert!(msg.contains("tag"), "msg was: {msg}");
+}
+
+#[test]
+fn test_enum_tag_attr_allows_newtype_variant() {
+    let input = r#"
+        #[serde(tag = "type")]
+        enum E {
+            A(u8),
+        }
+    "#;
+
+    let expected = quote! {
+        ::serde_sc::expr::TypeExpr::Enum {
+            name: ::std::borrow::Cow::Borrowed("E"),
+            tag: ::std::option::Option::Some(::std::borrow::Cow::Borrowed("type")),
+            content: ::std::option::Option::None,
+            variants: vec![
+                ::serde_sc::expr::EnumVariant::new(
+                    "A",
+                    ::serde_sc::expr::VariantKind::Newtype(::std::boxed::Box::new(
+                        ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U8)
+                    ))
+                )
+            ],
+        }
+    };
+
+    check_enum_to_typeexpr(input, expected);
 }
 
 #[test]

@@ -449,14 +449,19 @@ fn enum_to_typeexpr(
     }
 
     if container.tag.is_some() && container.content.is_none() {
-        // `#[serde(tag = "...")]` (internally tagged) only supports unit and struct variants.
+        // `#[serde(tag = "...")]` (internally tagged).
+        //
+        // supports unit/struct/newtype variants for internally tagged enums.
         for v in &de.variants {
             match &v.fields {
                 Fields::Unit | Fields::Named(_) => {}
-                Fields::Unnamed(_) => {
+                Fields::Unnamed(fields) => {
+                    if fields.unnamed.len() == 1 {
+                        continue;
+                    }
                     return Err(Error::new(
                         v.span(),
-                        "serde_sc: #[serde(tag = ...)] is only supported for enums with unit/struct variants",
+                        "serde_sc: #[serde(tag = ...)] is only supported for enums with unit/struct/newtype variants",
                     ));
                 }
             }
