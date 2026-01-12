@@ -4,7 +4,11 @@ use crate::{
     registry::RegistryContext,
 };
 
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+    sync::Arc,
+};
 
 /// Trait for describing how a type maps to a TypeExpr schema for serialization/deserialization.
 pub trait SerdeSchema: 'static {
@@ -33,6 +37,40 @@ pub trait SerdeSchema: 'static {
 impl SerdeSchema for () {
     fn build_type_expr(_ctxt: &mut Context) -> TypeExpr {
         TypeExpr::Unit
+    }
+}
+
+macro_rules! impl_serde_schema_for_primitive {
+    ($ty:ty, $prim:ident) => {
+        impl SerdeSchema for $ty {
+            fn build_type_expr(_ctxt: &mut Context) -> TypeExpr {
+                TypeExpr::Primitive(PrimitiveType::$prim)
+            }
+        }
+    };
+}
+
+impl_serde_schema_for_primitive!(bool, Bool);
+impl_serde_schema_for_primitive!(i8, I8);
+impl_serde_schema_for_primitive!(i16, I16);
+impl_serde_schema_for_primitive!(i32, I32);
+impl_serde_schema_for_primitive!(i64, I64);
+impl_serde_schema_for_primitive!(i128, I128);
+// Serde data model has no isize/usize; serde serializes them via i64/u64.
+impl_serde_schema_for_primitive!(isize, I64);
+impl_serde_schema_for_primitive!(u8, U8);
+impl_serde_schema_for_primitive!(u16, U16);
+impl_serde_schema_for_primitive!(u32, U32);
+impl_serde_schema_for_primitive!(u64, U64);
+impl_serde_schema_for_primitive!(u128, U128);
+impl_serde_schema_for_primitive!(usize, U64);
+impl_serde_schema_for_primitive!(f32, F32);
+impl_serde_schema_for_primitive!(f64, F64);
+impl_serde_schema_for_primitive!(char, Char);
+
+impl SerdeSchema for String {
+    fn build_type_expr(_ctxt: &mut Context) -> TypeExpr {
+        TypeExpr::String
     }
 }
 
@@ -65,6 +103,63 @@ where
 {
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
         TypeExpr::option(T::build_type_expr(ctxt))
+    }
+}
+
+impl<T> SerdeSchema for Box<T>
+where
+    T: SerdeSchema,
+{
+    fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
+        T::build_type_expr(ctxt)
+    }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        T::on_register(registry);
+        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.set_pending::<Self>(false);
+    }
+}
+
+impl<T> SerdeSchema for Arc<T>
+where
+    T: SerdeSchema,
+{
+    fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
+        T::build_type_expr(ctxt)
+    }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        T::on_register(registry);
+        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.set_pending::<Self>(false);
+    }
+}
+
+impl<T> SerdeSchema for Rc<T>
+where
+    T: SerdeSchema,
+{
+    fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
+        T::build_type_expr(ctxt)
+    }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        T::on_register(registry);
+        registry.try_insert_with(std::any::TypeId::of::<Self>(), Self::type_expr);
+        registry.set_pending::<Self>(false);
     }
 }
 
