@@ -149,7 +149,8 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
     match expr {
         ScTypeExpr::Remote { path, type_id } => {
             let Some(name) = world.resolve(*type_id) else {
-                panic!("failed to get name of remote type {path}")
+                let e = world.registry.get(*type_id).map(|o| o.name);
+                panic!("failed to get name of remote type {path} ({e:?})")
             };
             TypeExpr::Remote(name)
         }
