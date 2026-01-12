@@ -23,7 +23,11 @@ pub trait SerdeSchema: 'static {
         Self: Sized,
     {
         if ctxt.is_pending::<Self>() {
-            panic!("Recursive type detected: {}", std::any::type_name::<Self>());
+            panic!(
+                "Recursive type detected: {}, pending: {:?}",
+                std::any::type_name::<Self>(),
+                ctxt.pending()
+            );
         }
         ctxt.set_pending::<Self>(true);
         let expr = Self::build_type_expr(ctxt);

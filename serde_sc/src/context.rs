@@ -1,11 +1,11 @@
-use std::{any::TypeId, collections::HashSet};
+use std::{any::TypeId, collections::HashMap};
 
 use crate::SerdeSchema;
 
 /// Context used during schema building, such as for tracking which types are being processed to prevent infinite recursion.
 #[derive(Debug, Default)]
 pub struct Context {
-    pending: HashSet<TypeId>,
+    pending: HashMap<TypeId, &'static str>,
 }
 
 impl Context {
@@ -14,7 +14,7 @@ impl Context {
     where
         T: SerdeSchema,
     {
-        self.pending.contains(&T::type_id())
+        self.pending.contains_key(&T::type_id())
     }
 
     /// Marks the type `T` as pending or not, according to the `pending` argument.
@@ -24,9 +24,14 @@ impl Context {
     {
         let id = T::type_id();
         if pending {
-            self.pending.insert(id);
+            self.pending.insert(id, std::any::type_name::<T>());
         } else {
             self.pending.remove(&id);
         }
+    }
+
+    #[doc(hidden)]
+    pub fn pending(&self) -> &HashMap<TypeId, &'static str> {
+        &self.pending
     }
 }
