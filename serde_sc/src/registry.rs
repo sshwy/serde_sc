@@ -36,7 +36,7 @@ impl Registry {
     where
         T: SerdeSchema + 'static,
     {
-        let type_id = T::type_id();
+        let type_id = TypeId::of::<T>();
         if self.state.contains_key(&type_id) {
             return;
         }
@@ -80,13 +80,13 @@ pub struct RegistryContext<'a> {
 
 impl<'a> RegistryContext<'a> {
     /// Returns whether `T` is currently being registered (cycle breaker).
-    pub fn is_pending<T: SerdeSchema>(&self) -> bool {
-        self.pending.contains(&T::type_id())
+    pub fn is_pending<T: ?Sized + 'static>(&self) -> bool {
+        self.pending.contains(&TypeId::of::<T>())
     }
 
     /// Marks `T` as pending (true) or clears it (false).
-    pub fn set_pending<T: SerdeSchema>(&mut self, pending: bool) {
-        let type_id = T::type_id();
+    pub fn set_pending<T: ?Sized + 'static>(&mut self, pending: bool) {
+        let type_id = TypeId::of::<T>();
         if pending {
             self.pending.insert(type_id);
         } else {
@@ -96,7 +96,7 @@ impl<'a> RegistryContext<'a> {
 
     pub fn try_register<T>(&mut self)
     where
-        T: SerdeSchema,
+        T: SerdeSchema + 'static,
     {
         self.registry.try_register::<T>();
     }

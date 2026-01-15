@@ -5,7 +5,6 @@ use crate::{
 };
 
 use std::{
-    any::TypeId,
     collections::{BTreeMap, HashMap},
     rc::Rc,
     sync::Arc,
@@ -57,14 +56,6 @@ pub trait SerdeSchema: 'static {
         Self: Sized,
     {
         Self::build_type_expr_no_recursion(&mut Default::default())
-    }
-
-    /// Returns the `TypeId` of the implementing type used for schema identity check.
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        TypeId::of::<Self>()
     }
 }
 
@@ -157,13 +148,6 @@ where
         registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
-
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        T::type_id()
-    }
 }
 
 impl<T> SerdeSchema for Arc<T>
@@ -183,13 +167,6 @@ where
         registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
     }
-
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        T::type_id()
-    }
 }
 
 impl<T> SerdeSchema for Rc<T>
@@ -208,13 +185,6 @@ where
         T::on_register(registry);
         registry.try_register::<Self>();
         registry.set_pending::<Self>(false);
-    }
-
-    fn type_id() -> TypeId
-    where
-        Self: Sized,
-    {
-        T::type_id()
     }
 }
 

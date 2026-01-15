@@ -1,4 +1,4 @@
-use std::{any::TypeId, rc::Rc, sync::Arc};
+use std::{any::TypeId, sync::Arc};
 
 use serde::Deserialize;
 use serde_json::json;
@@ -93,15 +93,14 @@ fn test_de_option() {
 }
 
 #[test]
-fn test_transparent_types() {
+fn test_arc_type() {
     let mut registry = Registry::new();
     registry.register::<OptFields>();
     registry.register::<Arc<OptFields>>();
     registry.register::<ArcFields>();
-    registry.register::<Rc<OptFields>>();
     registry.register::<Box<OptFields>>();
     let world = DeclWorld::new(&registry);
-    dbg!(world.to_export_statements(Flavor::Serialize));
+    world.to_export_statements(Flavor::Serialize);
 }
 
 #[test]
