@@ -14,7 +14,7 @@ use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
 
 pub struct DeclWorld<'a> {
     registry: &'a Registry,
-    id_to_name: HashMap<TypeId, String>,
+    id_to_name: HashMap<TypeId, (String, &'static str)>,
     name_to_id: BTreeMap<String, (TypeId, &'static str)>,
 }
 
@@ -31,7 +31,7 @@ impl<'a> DeclWorld<'a> {
                     name
                 };
                 name_to_id.insert(name.to_string(), (*type_id, item.name));
-                id_to_name.insert(*type_id, name.to_string());
+                id_to_name.insert(*type_id, (name.to_string(), item.name));
             }
         }
         Self {
@@ -53,11 +53,11 @@ impl<'a> DeclWorld<'a> {
     /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
     pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
         let ts_expr = self.to_type_expr(type_id, flavor);
-        let name = self.resolve(type_id).expect("type name not found");
+        let (name, rust_name) = self.resolve(type_id).expect("type name not found");
         let ts_expr_str = format!("{:80.4}", ts_expr);
 
         let mut out = String::new();
-        out.push_str(&format!("// Rust type: {}\n", name));
+        out.push_str(&format!("// Rust type: {}\n", rust_name));
         out.push_str("export type ");
         out.push_str(&name);
         out.push_str(" = ");
@@ -76,7 +76,7 @@ impl<'a> DeclWorld<'a> {
     }
 
     /// Returns the Rust type name for the given TypeId, if it exists.
-    pub fn resolve(&self, type_id: TypeId) -> Option<String> {
+    pub fn resolve(&self, type_id: TypeId) -> Option<(String, &'static str)> {
         if let Some(s) = self.id_to_name.get(&type_id).cloned() {
             return Some(s);
         }
@@ -88,28 +88,20 @@ impl<'a> DeclWorld<'a> {
         None
     }
 
-    fn resolve_primitives(&self, type_id: TypeId) -> Option<String> {
-        if type_id == TypeId::of::<i8>()
-            || type_id == TypeId::of::<i16>()
-            || type_id == TypeId::of::<i32>()
-            || type_id == TypeId::of::<i64>()
-            || type_id == TypeId::of::<i128>()
-            || type_id == TypeId::of::<u8>()
-            || type_id == TypeId::of::<u16>()
-            || type_id == TypeId::of::<u32>()
-            || type_id == TypeId::of::<u64>()
-            || type_id == TypeId::of::<u128>()
-            || type_id == TypeId::of::<f32>()
-            || type_id == TypeId::of::<f64>()
-        {
-            Some("number".to_string())
-        } else if type_id == TypeId::of::<bool>() {
-            Some("boolean".to_string())
-        } else if type_id == TypeId::of::<String>() {
-            Some("string".to_string())
-        } else {
-            None
+    fn resolve_primitives(&self, type_id: TypeId) -> Option<(String, &'static str)> {
+        macro_rules! if_match {
+            ($type_id:ident, $name:literal, $( $ty:ty )|* ) => {
+                $( if $type_id == TypeId::of::<$ty>() {
+                    return Some(($name.to_string(), std::any::type_name::<$ty>()));
+                } )*
+            };
         }
+        if_match!(type_id, "number", i8 | i16 | i32 | i64 | i128 | isize);
+        if_match!(type_id, "number", u8 | u16 | u32 | u64 | u128 | usize);
+        if_match!(type_id, "number", f32 | f64);
+        if_match!(type_id, "boolean", bool);
+        if_match!(type_id, "string", String);
+        None
     }
 }
 
@@ -152,7 +144,7 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
                 let e = world.registry.get(*type_id).map(|o| o.name);
                 panic!("failed to get name of remote type {path} ({e:?})")
             };
-            TypeExpr::Remote(name)
+            TypeExpr::Remote(name.0)
         }
 
         ScTypeExpr::Primitive(p) => match p {
