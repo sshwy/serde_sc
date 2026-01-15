@@ -11,7 +11,7 @@ use serde_sc::{expr::TypeExpr as ScTypeExpr, registry::Registry};
 
 pub struct DeclWorld<'a> {
     registry: &'a Registry,
-    id_to_name: HashMap<TypeId, (String, &'static str)>,
+    id_to_name: HashMap<TypeId, (Option<String>, &'static str)>,
     name_to_id: BTreeMap<String, (TypeId, &'static str)>,
 }
 
@@ -21,15 +21,16 @@ impl<'a> DeclWorld<'a> {
         let mut id_to_name = HashMap::new();
         let mut name_to_id = BTreeMap::new();
         for (type_id, item) in registry.iter() {
-            if let Some(name) = item.expr.name() {
+            let name = item.expr.name();
+            if let Some(name) = name {
                 let name: &str = if name_to_id.contains_key(name) {
                     &(String::from(name) + "_")
                 } else {
                     name
                 };
                 name_to_id.insert(name.to_string(), (*type_id, item.name));
-                id_to_name.insert(*type_id, (name.to_string(), item.name));
             }
+            id_to_name.insert(*type_id, (name.map(|s| s.to_string()), item.name));
         }
         Self {
             registry,
@@ -74,12 +75,15 @@ impl<'a> DeclWorld<'a> {
 
     /// Returns the Rust type name for the given TypeId, if it exists.
     pub fn resolve(&self, type_id: TypeId) -> Option<(String, &'static str)> {
-        if let Some(s) = self.id_to_name.get(&type_id).cloned() {
+        if let Some(s) = self.resolve_primitives(type_id) {
             return Some(s);
         }
 
-        if let Some(s) = self.resolve_primitives(type_id) {
-            return Some(s);
+        if let Some((name, rust_name)) = self.id_to_name.get(&type_id).cloned() {
+            let Some(name) = name else {
+                panic!("name not found for type {type_id:?} ({rust_name})");
+            };
+            return Some((name, rust_name));
         }
 
         None
