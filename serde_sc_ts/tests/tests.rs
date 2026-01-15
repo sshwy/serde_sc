@@ -17,13 +17,6 @@ struct OptFields {
     opt_opt_opt_field: Option<Option<Option<i32>>>,
 }
 
-#[derive(SerdeSchema, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
-struct ArcFields {
-    #[serde(flatten)]
-    arc: Arc<OptFields>,
-}
-
 // Assertions tell us that nested options are handled just like a single option during JSON deserialization.
 #[test]
 fn test_de_option() {
@@ -92,6 +85,15 @@ fn test_de_option() {
     )
 }
 
+#[derive(SerdeSchema, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+struct ArcFields {
+    field: OptFields,
+    arc: Arc<OptFields>,
+    #[serde(flatten)]
+    flatten_arc: Arc<OptFields>,
+}
+
 #[test]
 fn test_arc_type() {
     let mut registry = Registry::new();
@@ -100,7 +102,7 @@ fn test_arc_type() {
     registry.register::<ArcFields>();
     registry.register::<Box<OptFields>>();
     let world = DeclWorld::new(&registry);
-    world.to_export_statements(Flavor::Serialize);
+    eprintln!("{}", world.to_export_statements(Flavor::Serialize));
 }
 
 #[test]
