@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::json;
 use serde_sc::{SerdeSchema, registry::Registry};
 
-use crate::{
+use serde_sc_ts::{
     DeclWorld, Flavor,
     expr::{Field, TypeExpr},
 };
@@ -126,6 +126,6 @@ fn test_primitive_fields() {
     let world = DeclWorld::new(&registry);
     assert_eq!(
         world.to_export_statements(Flavor::Serialize),
-        "// Rust type: serde_sc_ts::world::tests::MyStruct\nexport type MyStruct = {\n    id: number;\n};\n"
+        "// Rust type: tests::MyStruct\nexport type MyStruct = {\n    id: number;\n};\n"
     );
 }
