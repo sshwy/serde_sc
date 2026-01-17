@@ -50,8 +50,9 @@ impl<'a> DeclWorld<'a> {
 
     /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
     pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
-        let ts_expr = self.to_type_expr(type_id, flavor);
         let (name, rust_name) = self.resolve(type_id).expect("type name not found");
+
+        let ts_expr = self.to_type_expr(type_id, flavor);
         let ts_expr_str = format!("{:80.4}", ts_expr);
 
         let mut out = String::new();
@@ -65,8 +66,8 @@ impl<'a> DeclWorld<'a> {
     }
 
     /// Returns an iterator over all registered type ids in the lexical order of the type names.
-    pub fn iter_type_ids(&self) -> impl Iterator<Item = TypeId> {
-        self.name_to_id.values().map(|(type_id, _)| *type_id)
+    pub fn iter_type_ids(&self) -> impl Iterator<Item = (TypeId, &'static str)> {
+        self.name_to_id.values().copied()
     }
 
     /// Generates TypeScript export statements for all registered types.
