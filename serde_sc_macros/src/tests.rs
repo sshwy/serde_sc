@@ -231,6 +231,36 @@ fn test_option_in_struct() {
 }
 
 #[test]
+fn test_box_arc_rc_in_struct() {
+    let input = r#"
+        struct S {
+            a: Box<u32>,
+            b: std::sync::Arc<Vec<u8>>,
+            c: std::rc::Rc<Option<i32>>,
+        }
+        "#;
+    let expected = quote! {{
+        let mut __fields: ::std::vec::Vec<::serde_sc::expr::Field> = ::std::vec::Vec::new();
+        __fields.push(::serde_sc::expr::Field::new(
+            "a",
+            ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::U32)
+        ));
+        __fields.push(::serde_sc::expr::Field::new("b", ::serde_sc::expr::TypeExpr::Bytes));
+        __fields.push(::serde_sc::expr::Field::new(
+            "c",
+            ::serde_sc::expr::TypeExpr::Option(::std::boxed::Box::new(
+                ::serde_sc::expr::TypeExpr::Primitive(::serde_sc::expr::PrimitiveType::I32)
+            ))
+        ));
+        ::serde_sc::expr::TypeExpr::Struct {
+            name: ::std::borrow::Cow::Borrowed("S"),
+            fields: __fields,
+        }
+    }};
+    check_struct_to_typeexpr(input, expected);
+}
+
+#[test]
 fn test_newtype_struct() {
     let expected = quote! {
         ::serde_sc::expr::TypeExpr::NewtypeStruct {

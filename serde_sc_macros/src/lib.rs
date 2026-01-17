@@ -236,7 +236,7 @@ fn collect_custom_types_from_type(ty: &Type, allow_remote: bool, out: &mut Vec<T
         if last == "String" || last == "str" {
             return;
         }
-        if last == "Box" {
+        if last == "Box" || last == "Arc" || last == "Rc" {
             if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
                 collect_custom_types_from_type(inner, allow_remote, out);
             }
@@ -283,7 +283,10 @@ fn collect_flatten_target_type(ty: &Type, out: &mut Vec<Type>) {
             }
             Type::Path(p) => {
                 let last = p.path.segments.last().map(|s| s.ident.to_string());
-                if last.as_deref() == Some("Box") {
+                if last.as_deref() == Some("Box")
+                    || last.as_deref() == Some("Arc")
+                    || last.as_deref() == Some("Rc")
+                {
                     if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
                         cur = inner;
                         continue;
@@ -687,7 +690,7 @@ fn type_to_typeexpr(ty: &Type, sc: &syn::Path, allow_remote: bool) -> TokenStrea
         }
 
         // Box<T> serializes as T.
-        if last == "Box" {
+        if last == "Box" || last == "Arc" || last == "Rc" {
             if let Some(inner) = first_type_arg(p.path.segments.last().unwrap()) {
                 return type_to_typeexpr(inner, sc, allow_remote);
             }
