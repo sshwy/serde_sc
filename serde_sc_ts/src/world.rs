@@ -39,6 +39,11 @@ impl<'a> DeclWorld<'a> {
         }
     }
 
+    /// Returns the registry used to create this world.
+    pub fn registry(&self) -> &'a Registry {
+        self.registry
+    }
+
     /// Converts the given Rust type (by TypeId) into a TypeScript TypeExpr using the configured flavor.
     pub fn to_type_expr(&self, type_id: TypeId, flavor: Flavor) -> TypeExpr {
         let item = self
