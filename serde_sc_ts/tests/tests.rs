@@ -1,4 +1,4 @@
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, rc::Rc, sync::Arc};
 
 use serde::Deserialize;
 use serde_json::json;
@@ -129,5 +129,60 @@ fn test_primitive_fields() {
     assert_eq!(
         world.to_export_statements(Flavor::Serialize),
         "// Rust type: tests::MyStruct\nexport type MyStruct = {\n    id: number;\n};\n"
+    );
+}
+
+#[derive(SerdeSchema)]
+struct InnerOption;
+
+#[derive(SerdeSchema)]
+struct InnerVec;
+
+#[derive(SerdeSchema)]
+struct InnerArc;
+
+#[derive(SerdeSchema)]
+struct InnerRc;
+
+#[derive(SerdeSchema)]
+struct InnerBox;
+
+#[test]
+fn test_wrapper_types() {
+    let mut registry = Registry::new();
+
+    // Option
+    registry.register::<Option<InnerOption>>();
+    assert!(
+        registry.get(TypeId::of::<InnerOption>()).is_some(),
+        "dependent type should be registered"
+    );
+
+    // Vec
+    registry.register::<Vec<InnerVec>>();
+    assert!(
+        registry.get(TypeId::of::<InnerVec>()).is_some(),
+        "dependent type should be registered"
+    );
+
+    // Arc
+    registry.register::<Arc<InnerArc>>();
+    assert!(
+        registry.get(TypeId::of::<InnerArc>()).is_some(),
+        "dependent type should be registered for Arc"
+    );
+
+    // Rc
+    registry.register::<Rc<InnerRc>>();
+    assert!(
+        registry.get(TypeId::of::<InnerRc>()).is_some(),
+        "dependent type should be registered for Rc"
+    );
+
+    // Box
+    registry.register::<Box<InnerBox>>();
+    assert!(
+        registry.get(TypeId::of::<InnerBox>()).is_some(),
+        "dependent type should be registered for Box"
     );
 }

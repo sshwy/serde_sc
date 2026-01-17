@@ -129,6 +129,16 @@ where
     fn build_type_expr(ctxt: &mut Context) -> TypeExpr {
         TypeExpr::option(T::build_type_expr_no_recursion(ctxt))
     }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        T::on_register(registry);
+        registry.try_register::<Self>();
+        registry.set_pending::<Self>(false);
+    }
 }
 
 impl<T> SerdeSchema for Box<T>
@@ -200,6 +210,16 @@ where
             TypeExpr::seq(inner)
         }
     }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        T::on_register(registry);
+        registry.try_register::<Self>();
+        registry.set_pending::<Self>(false);
+    }
 }
 
 impl<K, V> SerdeSchema for HashMap<K, V>
@@ -213,6 +233,17 @@ where
             V::build_type_expr_no_recursion(ctxt),
         )
     }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        K::on_register(registry);
+        V::on_register(registry);
+        registry.try_register::<Self>();
+        registry.set_pending::<Self>(false);
+    }
 }
 
 impl<K, V> SerdeSchema for BTreeMap<K, V>
@@ -225,5 +256,16 @@ where
             K::build_type_expr_no_recursion(ctxt),
             V::build_type_expr_no_recursion(ctxt),
         )
+    }
+
+    fn on_register(registry: &mut RegistryContext) {
+        if registry.is_pending::<Self>() {
+            return;
+        }
+        registry.set_pending::<Self>(true);
+        K::on_register(registry);
+        V::on_register(registry);
+        registry.try_register::<Self>();
+        registry.set_pending::<Self>(false);
     }
 }
