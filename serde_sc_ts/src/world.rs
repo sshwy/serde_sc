@@ -51,6 +51,9 @@ impl<'a> DeclWorld<'a> {
     /// Generates a TypeScript export statement for the given type, including a comment describing the Rust type name.
     pub fn to_export_statement(&self, type_id: TypeId, flavor: Flavor) -> String {
         let (name, rust_name) = self.resolve(type_id).expect("type name not found");
+        let Some(name) = name else {
+            panic!("name not found for type {type_id:?} ({rust_name})");
+        };
 
         let ts_expr = self.to_type_expr(type_id, flavor);
         let ts_expr_str = format!("{:80.4}", ts_expr);
@@ -79,20 +82,13 @@ impl<'a> DeclWorld<'a> {
         out
     }
 
-    /// Returns the Rust type name for the given TypeId, if it exists.
-    pub fn resolve(&self, type_id: TypeId) -> Option<(String, &'static str)> {
-        if let Some(s) = self.resolve_primitives(type_id) {
-            return Some(s);
+    /// Returns the TypeScript name (if any) and Rust type name for the given TypeId.
+    pub fn resolve(&self, type_id: TypeId) -> Option<(Option<String>, &'static str)> {
+        if let Some((name, rust_name)) = self.resolve_primitives(type_id) {
+            return Some((Some(name), rust_name));
         }
 
-        if let Some((name, rust_name)) = self.id_to_name.get(&type_id).cloned() {
-            let Some(name) = name else {
-                panic!("name not found for type {type_id:?} ({rust_name})");
-            };
-            return Some((name, rust_name));
-        }
-
-        None
+        self.id_to_name.get(&type_id).cloned()
     }
 
     fn resolve_primitives(&self, type_id: TypeId) -> Option<(String, &'static str)> {
@@ -147,11 +143,14 @@ fn to_ts_type_expr(expr: &ScTypeExpr, world: &DeclWorld, flavor: Flavor) -> Type
 
     match expr {
         ScTypeExpr::Remote { path, type_id } => {
-            let Some(name) = world.resolve(*type_id) else {
+            let Some((name, _)) = world.resolve(*type_id) else {
                 let e = world.registry.get(*type_id).map(|o| o.name);
                 panic!("failed to get name of remote type {path} ({e:?})")
             };
-            TypeExpr::Remote(name.0)
+            if let Some(name) = name {
+                return TypeExpr::Remote(name);
+            }
+            world.to_type_expr(*type_id, flavor)
         }
 
         ScTypeExpr::Primitive(p) => match p {
