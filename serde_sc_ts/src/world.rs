@@ -64,6 +64,11 @@ impl<'a> DeclWorld<'a> {
         out
     }
 
+    /// Returns an iterator over all registered type ids in the lexical order of the type names.
+    pub fn iter_type_ids(&self) -> impl Iterator<Item = TypeId> {
+        self.name_to_id.values().map(|(type_id, _)| *type_id)
+    }
+
     /// Generates TypeScript export statements for all registered types.
     pub fn to_export_statements(&self, flavor: Flavor) -> String {
         let mut out = String::new();
